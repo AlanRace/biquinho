@@ -212,7 +212,6 @@ version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fea147ef1ebb92d41294cfad804c40de151b174c711ce6e0a4a40eba23eae1a4"
 dependencies = [
- "bevy_dylib",
  "bevy_internal",
 ]
 
@@ -313,25 +312,6 @@ dependencies = [
  "bevy_log",
  "bevy_time",
  "bevy_utils",
-]
-
-[[package]]
-name = "bevy_dylib"
-version = "0.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9b9ac2612b037838ab2ded3222a21ef56c36a1e0f04e6be97493d4532972f32b"
-dependencies = [
- "bevy_internal",
-]
-
-[[package]]
-name = "bevy_dynamic_plugin"
-version = "0.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3b4a7d559c6f91bb80df2f100080efca9a432f1bd1067237cbb1d705b8628cb4"
-dependencies = [
- "bevy_app",
- "libloading",
 ]
 
 [[package]]
@@ -453,7 +433,6 @@ dependencies = [
  "bevy_core_pipeline",
  "bevy_derive",
  "bevy_diagnostic",
- "bevy_dynamic_plugin",
  "bevy_ecs",
  "bevy_gltf",
  "bevy_hierarchy",

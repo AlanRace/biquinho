@@ -48,8 +48,8 @@ version = "0.8"
 default-features = false
 # These are the remaining default features other than `bevy_audio` and `mp3`
 features = [
-  "dynamic",
-  "bevy_dynamic_plugin",
+#  "dynamic",
+#  "bevy_dynamic_plugin",
   "render",
   "bevy_winit",
 #  "bevy_gilrs", # Adds gamepad support.
