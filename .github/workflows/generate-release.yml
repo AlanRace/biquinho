@@ -76,10 +76,10 @@ jobs:
     - name: List target/release
       run: ls target/release
     - name: zip macos artifact
+    #        mv target/release/libbevy_dylib.dylib libbevy_dylib.dylib
       run: |
         mv target/release/biquinho biquinho
-        mv target/release/libbevy_dylib.dylib libbevy_dylib.dylib
-        zip -r biquinho-macos target/release/biquinho biquinho libbevy_dylib.dylib assets/
+        zip -r biquinho-macos target/release/biquinho biquinho assets/
         
     - name: upload macos artifact
       uses: actions/upload-artifact@v1
@@ -103,10 +103,10 @@ jobs:
       run: cargo build --release 
       
     - name: zip linux artifact
+    #mv target/release/libbevy_dylib.so libbevy_dylib.so
       run: |
         mv target/release/biquinho biquinho
-        mv target/release/libbevy_dylib.so libbevy_dylib.so
-        zip -r biquinho-linux biquinho libbevy_dylib.so assets/
+        zip -r biquinho-linux biquinho assets/
         
     - name: upload macos artifact
       uses: actions/upload-artifact@v1
@@ -126,9 +126,9 @@ jobs:
       run: dir target\release
       
     - name: zip win artifact
+    #        powershell Compress-Archive -Path .\target\release\bevy_dylib.dll -Update -DestinationPath biquinho-windows.zip 
       run: |
         powershell Compress-Archive .\target\release\biquinho.exe biquinho-windows.zip 
-        powershell Compress-Archive -Path .\target\release\bevy_dylib.dll -Update -DestinationPath biquinho-windows.zip 
         powershell Compress-Archive -Path .\assets  -Update -DestinationPath biquinho-windows.zip 
         
     - name: upload windows artifact
