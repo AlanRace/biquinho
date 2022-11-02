@@ -125,7 +125,7 @@ jobs:
       run: |
         powershell Compress-Archive .\target\release\biquinho.exe biquinho-windows.zip 
         powershell Compress-Archive -Path .\target\release\bevy_dylib.dll -Update -DestinationPath biquinho-windows.zip 
-        powershell Compress-Archive -Path .\asset  -Update -DestinationPath biquinho-windows.zip 
+        powershell Compress-Archive -Path .\assets  -Update -DestinationPath biquinho-windows.zip 
         
     - name: upload windows artifact
       uses: actions/upload-artifact@v1
