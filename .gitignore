@@ -1,0 +1,13 @@
+/target
+
+tmp.xml
+
+assets/fonts/lato.zip
+
+*.json
+
+*.pdf
+
+*.anno
+
+*.xml

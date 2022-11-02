@@ -1,0 +1,73 @@
+[package]
+name = "biquinho"
+version = "0.1.0"
+edition = "2021"
+description = ""
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+bevy_egui = "0.16"
+bevy_prototype_lyon = "0.6"
+hex = "0.4"
+image = "0.24"
+tiff = "0.7.4"
+rfd = "0.10"
+
+# Required to allow changing of the icon. This version must match the bevy version
+winit = "0.26.1"
+
+# Required for annotations
+geo-types = { version = "0.7", default-features = false, features=["serde"] }
+geo-booleanop = {git = "https://github.com/21re/rust-geo-booleanop", rev="69babb32"} #{path = '../rust-geo-booleanop/lib'}
+
+# Required for transforms
+nalgebra = "0.31.3"
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1.0"
+rand = "0.8.5"
+
+# Required for classification
+smartcore = "0.2.1"
+
+# Needed for async
+futures-lite = "1.11.3"
+
+# IMC specific crates
+imc-rs = {path = '../imc-rs/lib', optional = true} 
+
+[features]
+default = ["imc"]
+imc = ["dep:imc-rs"]
+
+[dev-dependencies]
+
+[dependencies.bevy]
+version = "0.8"
+default-features = false
+# These are the remaining default features other than `bevy_audio` and `mp3`
+features = [
+  "dynamic",
+  "bevy_dynamic_plugin",
+  "render",
+  "bevy_winit",
+  "bevy_gilrs",
+  "bevy_gltf",
+  "png",
+  "hdr",
+  "x11"
+]
+
+# Enable serde in egui as it is currently not enabled in bevy_egui
+[dependencies.egui]
+features = ["serde"]
+
+[profile.dev]
+opt-level = 3
+
+
+[patch.crates-io]
+#bevy_egui = { path = "../bevy_egui" }
+#egui = {path = "../egui"}
+#egui = { git = "https://github.com/emilk/egui"}
