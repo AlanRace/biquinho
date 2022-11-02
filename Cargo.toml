@@ -52,11 +52,11 @@ features = [
   "bevy_dynamic_plugin",
   "render",
   "bevy_winit",
-  "bevy_gilrs",
-  "bevy_gltf",
+#  "bevy_gilrs", # Adds gamepad support.
+  "bevy_gltf", # https://www.khronos.org/gltf/
   "png",
   "hdr",
-  "x11"
+  # "x11"
 ]
 
 # Enable serde in egui as it is currently not enabled in bevy_egui
