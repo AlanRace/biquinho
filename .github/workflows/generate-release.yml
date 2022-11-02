@@ -77,7 +77,7 @@ jobs:
       run: ls target/release
     - name: zip macos artifact
       run: |
-        zip -r biquinho-macos target/release/biquinho target/release/biquinho target/release/libbevy_dylib.so assets/
+        zip -r biquinho-macos target/release/biquinho target/release/biquinho target/release/libbevy_dylib.dylib assets/
         
     - name: upload macos artifact
       uses: actions/upload-artifact@v1
@@ -123,9 +123,9 @@ jobs:
       
     - name: zip win artifact
       run: |
-        powershell Compress-Archive target\release\biquihno.exe biquinho-windows.zip 
-        powershell Compress-Archive -Path target\release\libbevy_dylib.dll -Update -DestinationPath biquinho-windows.zip 
-        powershell Compress-Archive -Path asset/  -Update -DestinationPath biquinho-windows.zip 
+        powershell Compress-Archive .\target\release\biquinho.exe biquinho-windows.zip 
+        powershell Compress-Archive -Path .\target\release\bevy_dylib.dll -Update -DestinationPath biquinho-windows.zip 
+        powershell Compress-Archive -Path .\asset  -Update -DestinationPath biquinho-windows.zip 
         
     - name: upload windows artifact
       uses: actions/upload-artifact@v1
