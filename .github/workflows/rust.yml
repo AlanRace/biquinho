@@ -23,7 +23,7 @@ jobs:
       run: sudo apt-get update; sudo apt-get install --no-install-recommends -yq libasound2-dev libudev-dev;
       if: runner.os == 'linux'
     - name: install RFD dependencies
-      run: sudo apt-get update; sudo apt-get update -yq libgtk-3-dev
+      run: sudo apt-get update; sudo apt-get install -yq libgtk-3-dev
       if: runner.os == 'linux'
     - name: Build
       run: cargo build --verbose
