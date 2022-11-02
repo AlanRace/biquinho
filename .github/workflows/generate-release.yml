@@ -77,7 +77,9 @@ jobs:
       run: ls target/release
     - name: zip macos artifact
       run: |
-        zip -r biquinho-macos target/release/biquinho target/release/biquinho target/release/libbevy_dylib.dylib assets/
+        mv target/release/biquinho biquinho
+        mv target/release/libbevy_dylib.dylib libbevy_dylib.dylib
+        zip -r biquinho-macos target/release/biquinho biquinho libbevy_dylib.dylib assets/
         
     - name: upload macos artifact
       uses: actions/upload-artifact@v1
@@ -102,7 +104,9 @@ jobs:
       
     - name: zip linux artifact
       run: |
-        zip -r biquinho-linux target/release/biquinho target/release/libbevy_dylib.so assets/
+        mv target/release/biquinho biquinho
+        mv target/release/libbevy_dylib.so libbevy_dylib.so
+        zip -r biquinho-linux biquinho libbevy_dylib.so assets/
         
     - name: upload macos artifact
       uses: actions/upload-artifact@v1
