@@ -29,8 +29,6 @@ mod annotation;
 /// CameraPlugin - handles viewing data view one or more cameras and selecting and dragging objects viewed in the camera.
 mod camera;
 mod data;
-#[cfg(all(feature = "imc", feature = "msi"))]
-mod data_collection;
 // mod geometry;
 /// ImagePlugin - handles loading and viewing image data (including channel images).
 mod image_plugin;
@@ -40,28 +38,16 @@ mod imc;
 mod transform;
 /// UiPlugin - handles everything related to the user interface (currently everything egui related).
 mod ui;
-//mod imc_ui;
-#[cfg(feature = "msi")]
-mod imzml;
-#[cfg(feature = "msi")]
-mod msi;
-#[cfg(all(feature = "imc", feature = "msi"))]
-mod multimodal;
-#[cfg(feature = "msi")]
-mod scils;
-#[cfg(feature = "msi")]
-mod spectrum;
 
 use bevy::{
     diagnostic::LogDiagnosticsPlugin, prelude::*, render::texture::ImageSettings,
     tasks::AsyncComputeTaskPool, window::WindowId, winit::WinitWindows,
 };
 use bevy_prototype_lyon::plugin::ShapePlugin;
+use camera::CameraEvent;
 use data::DataPlugin;
 use image_plugin::ImagePlugin;
 use imc::LoadIMC;
-//use imc::{ChannelImage, IMCDataset};
-use camera::CameraEvent;
 use imc_rs::MCD;
 
 use transform::AffineTransform;
@@ -91,14 +77,7 @@ fn main() {
     #[cfg(feature = "imc")]
     let app = app.add_plugin(IMCPlugin);
 
-    #[cfg(feature = "msi")]
-    let app = app.add_plugin(MSIPlugin);
-
-    //.add_plugin(PencilPlugin)
     app.add_startup_system(load_test_data)
-        // .add_startup_system(load_data)
-        //.add_system(read_data_collection_stream)
-        //.add_startup_system(load_assets.system())
         .add_startup_system(setup)
         .add_startup_system(set_window_icon)
         .add_system(print_messages)
@@ -187,93 +166,6 @@ fn load_test_data(mut commands: Commands) {
         Ok(mcd)
     });
     commands.spawn().insert(LoadIMC(load_task));
-
-    // load_imc(mcd, &mut commands, &mut textures, &thread_pool);
-
-    #[cfg(feature = "msi")]
-    {
-        let mut path = PathBuf::from(
-            "/home/alan/Documents/Work/Nicole/Salmonella/panchali_set-oct19_pos_s5_50um.imzML",
-        );
-
-        let start = Instant::now();
-        path.set_extension("dat");
-        if let Ok(header) = msi_format::parse(&path) {
-            let msi_chunked: MSIChunked = header.into();
-            let duration = start.elapsed();
-
-            println!("Time elapsed parsing chunked data is: {:?}", duration);
-
-            let msi_dataset = MSIDataset::new(Box::new(msi_chunked));
-
-            let moving_points: Vec<Vector3<f64>> = vec![
-                Vector3::new(19.99999999999996, 121.00000000000006, 0.0),
-                Vector3::new(620.0812800000001, 406.0055999999998, 0.0),
-                Vector3::new(524.9307875066394, 100.22192074893758, 0.0),
-            ];
-
-            // Get transform
-            let fixed_points: Vec<Vector3<f64>> = vec![
-                Vector3::new(1708.2446857383977, 669.5510653929076, 0.0),
-                Vector3::new(4701.630281620892, 2088.2932549312454, 0.0),
-                Vector3::new(4228.058794080685, 568.3346466234503, 0.0),
-            ];
-            println!("Fixed: {:?}", fixed_points);
-            println!("Moving: {:?}", moving_points);
-
-            let transform = AffineTransform::from_points(
-                "affine_transform".to_string(),
-                fixed_points,
-                moving_points,
-            )
-            .scale(10.00000000000001, 10.00000000000001, 1.0);
-
-            commands
-                .spawn()
-                .with_children(|parent| {
-                    for acquisition in msi_dataset.acquisitions() {
-                        // let to_parent_transform =
-                        // AffineTransform::new(
-                        //     format!("acquisition_to_parent").to_string(),
-                        //     Matrix4::identity(),
-                        // );
-
-                        parent
-                            .spawn_bundle(SpriteBundle {
-                                transform: Transform::from_xyz(0.0 / 2.0, 25000.0 / 2.0, 0.0)
-                                    .mul_transform(create_transform(
-                                        &transform,
-                                        acquisition.width() as f32,
-                                        0.0, //acquisition.height() as f32,
-                                        false,
-                                    ))
-                                    .mul_transform(Transform::from_xyz(0.0, 0.0, 20.0)),
-                                sprite: Sprite {
-                                    anchor: Anchor::Center,
-                                    ..default()
-                                },
-                                ..default()
-                            })
-                            .insert(Draggable)
-                            .insert(UiEntry {
-                                description: acquisition.id().to_owned(),
-                            })
-                            .insert(Acquisition {
-                                id: acquisition.id().to_owned(),
-                            });
-                    }
-                    //})
-                })
-                .insert(PrimaryUiEntry {
-                    description: format!("MSI: {:?}", path.file_name()),
-                })
-                .insert(msi_dataset)
-                .insert(Transform::from_xyz(0.0, 0.0, 1.0))
-                .insert(GlobalTransform::default());
-        } else {
-            println!("No MSI data present")
-        }
-    }
 }
 
 /// Convert an `AffineTransform` into a bevy `Transform`.
