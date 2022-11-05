@@ -40,8 +40,12 @@ mod transform;
 mod ui;
 
 use bevy::{
-    diagnostic::LogDiagnosticsPlugin, prelude::*, render::texture::ImageSettings,
-    tasks::AsyncComputeTaskPool, window::WindowId, winit::WinitWindows,
+    diagnostic::LogDiagnosticsPlugin,
+    prelude::*,
+    render::texture::ImageSettings,
+    tasks::AsyncComputeTaskPool,
+    window::WindowId,
+    winit::{WinitSettings, WinitWindows},
 };
 use bevy_prototype_lyon::plugin::ShapePlugin;
 use camera::CameraEvent;
@@ -57,6 +61,7 @@ use crate::{imc::IMCPlugin, ui::UiPlugin};
 fn main() {
     let mut app = App::new();
     let app = app
+        .insert_resource(WinitSettings::desktop_app())
         .insert_resource(WindowDescriptor {
             title: "Biquinho".to_string(),
             //present_mode: PresentMode::Fifo,
