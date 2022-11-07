@@ -408,6 +408,9 @@ pub struct Annotation {
 
     active_tool: Option<Tool>,
     last_pixel: Option<Vec2>,
+
+    // We shouldn't (de-)serialise this as the entity will be different at the next run
+    #[serde(skip)]
     editing_camera: Option<Entity>,
 }
 

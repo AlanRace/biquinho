@@ -1338,15 +1338,16 @@ fn image_control_changed(
                                             }
                                         }
 
-                                        let intensity = image.data[index * 4 + 2]
-                                            .max(image.data[index * 4 + 1])
-                                            .max(image.data[index * 4]);
-                                        let alpha = match intensity {
-                                            0..=25 => intensity * 10,
-                                            _ => 255,
-                                        };
+                                        // let intensity = image.data[index * 4 + 2]
+                                        //     .max(image.data[index * 4 + 1])
+                                        //     .max(image.data[index * 4]);
+                                        // let alpha = match intensity {
+                                        //     0..=25 => intensity * 10,
+                                        //     _ => 255,
+                                        // };
 
-                                        image.data[index * 4 + 3] = alpha;
+                                        // image.data[index * 4 + 3] = alpha;
+                                        image.data[index * 4 + 3] = 255;
                                     }
                                 }
                             }
