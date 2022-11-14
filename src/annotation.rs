@@ -186,7 +186,7 @@ fn handle_annotation_event(
                     .collect();
 
                 if let Err(error) = save_annotations("autosave_annotations.json", &annotations) {
-                    commands.spawn().insert(Message::from(error));
+                    commands.spawn(Message::from(error));
                 }
             }
             AnnotationEvent::SetActiveTool {
@@ -236,7 +236,7 @@ fn handle_annotation_event(
                     .collect();
 
                 if let Err(error) = save_annotations("autosave_annotations.json", &annotations) {
-                    commands.spawn().insert(Message::from(error));
+                    commands.spawn(Message::from(error));
                 }
             }
             AnnotationEvent::Import(path) => match File::open(path) {
@@ -245,25 +245,21 @@ fn handle_annotation_event(
                     match serde_json::from_reader::<BufReader<File>, Vec<Annotation>>(reader) {
                         Ok(annotations) => {
                             for annotation in annotations {
-                                commands
-                                    .spawn()
-                                    .insert(annotation)
-                                    .insert(Visibility { is_visible: true })
-                                    .insert(Transform::default())
-                                    .insert(GlobalTransform::default());
+                                commands.spawn((
+                                    annotation,
+                                    Visibility { is_visible: true },
+                                    Transform::default(),
+                                    GlobalTransform::default(),
+                                ));
                             }
                         }
                         Err(error) => {
-                            commands
-                                .spawn()
-                                .insert(Message::from(AnnotationError::from(error)));
+                            commands.spawn(Message::from(AnnotationError::from(error)));
                         }
                     };
                 }
                 Err(error) => {
-                    commands
-                        .spawn()
-                        .insert(Message::from(AnnotationError::from(error)));
+                    commands.spawn(Message::from(AnnotationError::from(error)));
                 }
             },
             AnnotationEvent::Export {
@@ -289,7 +285,7 @@ fn handle_annotation_event(
                 }
 
                 if let Err(error) = save_annotations(location, &to_save) {
-                    commands.spawn().insert(Message::from(error));
+                    commands.spawn(Message::from(error));
                 }
             }
             AnnotationEvent::SetDescription {
@@ -314,19 +310,14 @@ fn load_autosaved_annotations(mut commands: Commands) {
         let annotations: Vec<Annotation> = match serde_json::from_reader(reader) {
             Ok(annotations) => annotations,
             Err(error) => {
-                commands
-                    .spawn()
-                    .insert(Message::from(AnnotationError::from(error)));
+                commands.spawn(Message::from(AnnotationError::from(error)));
 
                 return;
             }
         };
 
         for annotation in annotations {
-            commands
-                .spawn()
-                .insert(annotation)
-                .insert_bundle(SpatialBundle::default());
+            commands.spawn((annotation, SpatialBundle::default()));
         }
     }
 }
@@ -475,25 +466,25 @@ impl Annotation {
         let half_width = conf.width as f32 / 2.0;
         let half_height = conf.height as f32 / 2.0;
 
-        let top_left = conf.transform.mul_vec3(Vec3::new(
+        let top_left = conf.transform.transform_point(Vec3::new(
             from.0 as f32 - half_width,
             from.1 as f32 - half_height,
             1.0,
         ));
 
-        let top_right = conf.transform.mul_vec3(Vec3::new(
+        let top_right = conf.transform.transform_point(Vec3::new(
             to.0 as f32 - half_width,
             from.1 as f32 - half_height,
             1.0,
         ));
 
-        let bottom_right = conf.transform.mul_vec3(Vec3::new(
+        let bottom_right = conf.transform.transform_point(Vec3::new(
             to.0 as f32 - half_width,
             to.1 as f32 - half_height,
             1.0,
         ));
 
-        let bottom_left = conf.transform.mul_vec3(Vec3::new(
+        let bottom_left = conf.transform.transform_point(Vec3::new(
             from.0 as f32 - half_width,
             to.1 as f32 - half_height,
             1.0,
@@ -778,7 +769,7 @@ fn update_annotation(
                 let mut colour = annotation.bevy_colour();
                 colour.set_a(1.0);
 
-                parent.spawn().insert_bundle(GeometryBuilder::build_as(
+                parent.spawn(GeometryBuilder::build_as(
                     &path,
                     DrawMode::Outlined {
                         fill_mode: FillMode::color(annotation.bevy_colour()),
@@ -831,9 +822,8 @@ fn annotation_hint(
                     let mut colour = annotation.bevy_colour();
                     colour.set_a(0.25);
 
-                    commands
-                        .spawn()
-                        .insert_bundle(GeometryBuilder::build_as(
+                    commands.spawn((
+                        GeometryBuilder::build_as(
                             &path,
                             DrawMode::Outlined {
                                 fill_mode: FillMode::color(colour),
@@ -844,8 +834,9 @@ fn annotation_hint(
                                 },
                             },
                             Transform::from_xyz(current_world.x, current_world.y, 100.0),
-                        ))
-                        .insert(AnnotationHint { annotation: entity });
+                        ),
+                        AnnotationHint { annotation: entity },
+                    ));
                 }
                 Tool::Rubber { radius } => todo!(),
                 Tool::Polygon {} => todo!(),

@@ -47,7 +47,7 @@ impl Plugin for UiPlugin {
             .add_startup_system(configure_visuals)
             // .add_system(update_ui_scale_factor)
             .add_system(message_notification)
-            .add_system(ui_right_panel_exclusive.exclusive_system().label(UiLabel::Display))
+            .add_system(ui_right_panel_exclusive.label(UiLabel::Display))
             .add_system(imc_load_notification.after(UiLabel::Display))
             .add_system(ui_top_panel.label("top_panel").after(UiLabel::Display))
             .add_system(ui_bottom_panel.after("top_panel"))
@@ -136,9 +136,9 @@ impl UiIcon {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Resource)]
 pub struct UiSpace {
-    pub ui_space: UiRect<Val>,
+    pub ui_space: UiRect,
 }
 
 impl UiSpace {
@@ -192,6 +192,7 @@ impl Default for UiSpace {
     }
 }
 
+#[derive(Resource)]
 pub struct UiState {
     bevy_icons: HashMap<UiIcon, Handle<Image>>,
     egui_icons: HashMap<UiIcon, egui::TextureId>,

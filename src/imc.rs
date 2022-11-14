@@ -109,7 +109,7 @@ fn handle_imc_event(
                     MCD::parse_with_dcm(file, path.to_str().unwrap())
                 });
 
-                commands.spawn().insert(LoadIMC(load_task));
+                commands.spawn(LoadIMC(load_task));
 
                 //load_imc(mcd, &mut commands, &mut textures, &thread_pool);
             }
@@ -184,7 +184,7 @@ fn handle_imc_event(
                     }
                 });
 
-                commands.spawn().insert(BuildClassifier(load_task));
+                commands.spawn(BuildClassifier(load_task));
 
                 // let (classification_data, classification_labels, label_colours) =
                 //     create_labelled_data(labels, acquisitions, channels);
@@ -475,7 +475,7 @@ fn apply_classifier(
                                     })
                                 });
 
-                            commands.spawn().insert(ComputeClassifier(load_task));
+                            commands.spawn(ComputeClassifier(load_task));
 
                             // println!("Time to predict {:?}", Instant::now().duration_since(start));
 
@@ -853,8 +853,7 @@ fn load_imc(
                         .with_children(|parent| {
                             for slide in mcd.slides() {
                                 parent
-                                    .spawn()
-                                    .insert_bundle(SpatialBundle {
+                                    .spawn(SpatialBundle {
                                         transform: Transform::from_xyz(0.0, 0.0, 1.0),
                                         ..Default::default()
                                     })
@@ -884,36 +883,37 @@ fn load_imc(
                                         });
 
                                         parent
-                                            .spawn()
-                                            .insert(UiEntry {
-                                                description: format!(
-                                                    "{} (optical image)",
-                                                    slide.description()
-                                                ),
-                                            })
-                                            .insert(Draggable)
-                                            .insert(Opacity(1.0))
-                                            .insert(TiledImage {
-                                                size: Vec2::new(
-                                                    slide.width_in_um() as f32,
-                                                    slide.height_in_um() as f32,
-                                                ),
-                                                ..default()
-                                            })
-                                            .insert(BoundingBox {
-                                                x: 0.0,
-                                                y: 0.0,
-                                                width: slide.width_in_um() as f32,
-                                                height: slide.height_in_um() as f32,
-                                            })
-                                            .insert_bundle(SpatialBundle {
-                                                transform: Transform::from_xyz(
-                                                    slide.width_in_um() as f32 / 2.0,
-                                                    slide.height_in_um() as f32 / 2.0,
-                                                    0.0,
-                                                ),
-                                                ..Default::default()
-                                            })
+                                            .spawn((
+                                                UiEntry {
+                                                    description: format!(
+                                                        "{} (optical image)",
+                                                        slide.description()
+                                                    ),
+                                                },
+                                                Draggable,
+                                                Opacity(1.0),
+                                                TiledImage {
+                                                    size: Vec2::new(
+                                                        slide.width_in_um() as f32,
+                                                        slide.height_in_um() as f32,
+                                                    ),
+                                                    ..default()
+                                                },
+                                                BoundingBox {
+                                                    x: 0.0,
+                                                    y: 0.0,
+                                                    width: slide.width_in_um() as f32,
+                                                    height: slide.height_in_um() as f32,
+                                                },
+                                                SpatialBundle {
+                                                    transform: Transform::from_xyz(
+                                                        slide.width_in_um() as f32 / 2.0,
+                                                        slide.height_in_um() as f32 / 2.0,
+                                                        0.0,
+                                                    ),
+                                                    ..Default::default()
+                                                },
+                                            ))
                                             .insert(ComputeTileImage(image_task));
                                         //.with_children(|parent| {});
                                     })
@@ -1095,7 +1095,7 @@ fn load_imc(
                             }
 
                             // Now add in a new control for the images
-                            parent.spawn().insert(ImageControl {
+                            parent.spawn(ImageControl {
                                 description: "Red Channel".to_string(),
                                 entities: acquisition_entities.clone(),
                                 intensity_range: (0.0, 0.0),
@@ -1103,7 +1103,7 @@ fn load_imc(
                                 histogram: Vec::new(),
                                 colour_domain: (0.0, 0.0),
                             });
-                            parent.spawn().insert(ImageControl {
+                            parent.spawn(ImageControl {
                                 description: "Green Channel".to_string(),
                                 entities: acquisition_entities.clone(),
                                 intensity_range: (0.0, 0.0),
@@ -1111,7 +1111,7 @@ fn load_imc(
                                 histogram: Vec::new(),
                                 colour_domain: (0.0, 0.0),
                             });
-                            parent.spawn().insert(ImageControl {
+                            parent.spawn(ImageControl {
                                 description: "Blue Channel".to_string(),
                                 entities: acquisition_entities.clone(),
                                 intensity_range: (0.0, 0.0),
@@ -1444,8 +1444,7 @@ fn generate_channel_image(
                         }
 
                         let channel_image_entity = commands
-                            .spawn()
-                            .insert(AcquisitionChannelImage {
+                            .spawn(AcquisitionChannelImage {
                                 acquisition_entity: *acquisition_entity,
                                 data: Some(channel_data.add(channel_image)),
                             })
@@ -1456,8 +1455,7 @@ fn generate_channel_image(
                         commands.entity(entity).add_child(channel_image_entity);
                     } else {
                         let channel_image_entity = commands
-                            .spawn()
-                            .insert(AcquisitionChannelImage {
+                            .spawn(AcquisitionChannelImage {
                                 acquisition_entity: *acquisition_entity,
                                 data: None,
                             })

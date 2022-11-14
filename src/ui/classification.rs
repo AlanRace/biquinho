@@ -39,7 +39,7 @@ struct ClassificationWindow {
 }
 
 fn setup(mut commands: Commands) {
-    commands.spawn().insert(ClassificationWindow {
+    commands.spawn(ClassificationWindow {
         target: ClassificationTarget::FieldOfView,
         auto_update: false,
         acquisitions: HashMap::new(),

@@ -130,8 +130,8 @@ fn handle_camera_event(
     }
 }
 
-const MAX_CAMERA_WIDTH: f32 = 1e10;
-const MAX_CAMERA_HEIGHT: f32 = 1e10;
+// const MAX_CAMERA_WIDTH: f32 = 1e10;
+// const MAX_CAMERA_HEIGHT: f32 = 1e10;
 
 #[derive(Component)]
 pub struct PanCamera {
@@ -165,7 +165,7 @@ pub struct FieldOfView {
     pub bottom_right: Vec4,
 }
 
-#[derive(Component, Clone)]
+#[derive(Resource, Clone)]
 pub struct CameraSetup {
     pub x: u32,
     pub y: u32,
@@ -201,8 +201,10 @@ fn setup(mut commands: Commands, camera_setup: Res<CameraSetup>, asset_server: R
     camera_transform.scale.x *= 100.;
     camera_transform.scale.y *= 100.;
 
-    let mut camera_bundle = Camera2dBundle::default();
-    camera_bundle.transform = camera_transform;
+    // let camera_bundle = Camera2dBundle {
+    //     transform: camera_transform,
+    //     ..default()
+    // };
 
     // commands.spawn().insert(CameraSetup {
     //     x: 2,
@@ -213,8 +215,8 @@ fn setup(mut commands: Commands, camera_setup: Res<CameraSetup>, asset_server: R
     // Spawn the UI camera
     // Transform the camera well away from the view - there should be a nicer way to do this, but otherwise
     // this camera displays the scene as well as the UI, causing issues for the multiview cameras
-    commands
-        .spawn_bundle(Camera2dBundle {
+    commands.spawn((
+        Camera2dBundle {
             camera: Camera {
                 priority: 100,
                 ..default()
@@ -222,14 +224,14 @@ fn setup(mut commands: Commands, camera_setup: Res<CameraSetup>, asset_server: R
             camera_2d: Camera2d {
                 // don't clear the color while rendering this camera
                 clear_color: ClearColorConfig::None,
-                ..default()
             },
             transform: Transform::from_xyz(-1000000.0, 1000000.0, 0.0),
             ..default()
-        })
-        .insert(UiCameraConfig::default());
+        },
+        UiCameraConfig::default(),
+    ));
 
-    commands.spawn().insert(MousePosition::default());
+    commands.spawn(MousePosition::default());
 
     create_cameras(commands, camera_setup.as_ref(), &asset_server);
 }
@@ -282,7 +284,7 @@ fn create_cameras(mut commands: Commands, camera_setup: &CameraSetup, asset_serv
             };
 
             let camera_text = commands
-                .spawn_bundle(
+                .spawn(
                     // Create a TextBundle that has a Text with a single section.
                     TextBundle::from_section(
                         // Accepts a `String` or any type that converts into a `String`, such as `&str`
@@ -309,8 +311,8 @@ fn create_cameras(mut commands: Commands, camera_setup: &CameraSetup, asset_serv
                 .insert(CameraText)
                 .id();
 
-            let entity = commands
-                .spawn_bundle(camera_bundle)
+            commands
+                .spawn(camera_bundle)
                 .insert(PanCamera {
                     x,
                     y,
@@ -326,8 +328,7 @@ fn create_cameras(mut commands: Commands, camera_setup: &CameraSetup, asset_serv
                 //     width: MAX_CAMERA_WIDTH,
                 //     height: MAX_CAMERA_HEIGHT,
                 // })
-                .insert(Draggable)
-                .id();
+                .insert(Draggable);
 
             // println!("Creating cameras: {} {} => {:?}", x, y, entity);
         }
@@ -420,7 +421,7 @@ fn update_camera(
                 + ui_space.bottom();
 
             style.position = UiRect {
-                left: Val::Px(((width as u32 + camera_setup.margin) * position.x) as f32) + 10.0,
+                left: Val::Px(((width as u32 + camera_setup.margin) * position.x) as f32 + 10.0),
                 // right: Val::Px(((width + camera_setup.margin) * (position.x + 1)) as f32),
                 //top: Val::Px(pos_y + 100.0),
                 bottom: Val::Px(pos_y + 10.0), // Need to take into account the bottom info bar from egui!
@@ -589,8 +590,8 @@ fn select_object(
                 let bottom_right = sized.bottom_right(&images)?;
 
                 // Transform top left and bottom right points to world coordinates
-                let top_left = sized.transform.mul_vec3(top_left);
-                let bottom_right = sized.transform.mul_vec3(bottom_right);
+                let top_left = sized.transform.transform_point(top_left);
+                let bottom_right = sized.transform.transform_point(bottom_right);
 
                 // Perform check whether point in bounding box
                 if pos_world.x >= top_left.x.min(bottom_right.x)

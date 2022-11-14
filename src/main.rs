@@ -42,7 +42,6 @@ mod ui;
 use bevy::{
     diagnostic::LogDiagnosticsPlugin,
     prelude::*,
-    render::texture::ImageSettings,
     tasks::AsyncComputeTaskPool,
     window::WindowId,
     winit::{WinitSettings, WinitWindows},
@@ -50,7 +49,6 @@ use bevy::{
 use bevy_prototype_lyon::plugin::ShapePlugin;
 use camera::CameraEvent;
 use data::DataPlugin;
-use image_plugin::ImagePlugin;
 use imc::LoadIMC;
 use imc_rs::MCD;
 
@@ -62,18 +60,23 @@ fn main() {
     let mut app = App::new();
     let app = app
         .insert_resource(WinitSettings::desktop_app())
-        .insert_resource(WindowDescriptor {
-            title: "Biquinho".to_string(),
-            //present_mode: PresentMode::Fifo,
-            // scale_factor_override: Some(1.0),
-            ..Default::default()
-        })
-        .insert_resource(ImageSettings::default_nearest())
         .insert_resource(ClearColor(Color::rgb(0.3, 0.3, 0.3)))
-        .add_plugins(DefaultPlugins)
+        .add_plugins(
+            DefaultPlugins
+                .set(ImagePlugin::default_nearest())
+                .set(WindowPlugin {
+                    window: WindowDescriptor {
+                        title: "Biquinho".to_string(),
+                        //present_mode: PresentMode::Fifo,
+                        // scale_factor_override: Some(1.0),
+                        ..default()
+                    },
+                    ..default()
+                }),
+        )
         //.insert_resource(Msaa { samples: 4 })
         .add_plugin(UiPlugin)
-        .add_plugin(ImagePlugin)
+        .add_plugin(image_plugin::ImagePlugin)
         .add_plugin(DataPlugin)
         .add_plugin(LogDiagnosticsPlugin::default())
         // .add_plugin(FrameTimeDiagnosticsPlugin::default())
@@ -170,7 +173,7 @@ fn load_test_data(mut commands: Commands) {
 
         Ok(mcd)
     });
-    commands.spawn().insert(LoadIMC(load_task));
+    commands.spawn(LoadIMC(load_task));
 }
 
 /// Convert an `AffineTransform` into a bevy `Transform`.
