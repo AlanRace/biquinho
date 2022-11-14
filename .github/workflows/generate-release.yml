@@ -71,6 +71,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+    - name: Update rust
+      run: rustup update
     - name: Build
       run: cargo build --release 
     - name: List target/release
@@ -93,6 +95,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+    - name: Update rust
+      run: rustup update
     - name: Install Bevy dependencies
       run: sudo apt-get update; sudo apt-get install --no-install-recommends -yq libasound2-dev libudev-dev;
       
@@ -119,6 +123,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+    - name: Update rust
+      run: rustup update
     - name: Build
       run: cargo build --release 
     
