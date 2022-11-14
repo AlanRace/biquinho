@@ -18,6 +18,8 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
+    - name: Update rust
+      run: rustup update
     - uses: actions/checkout@v3
     - name: Install Bevy dependencies
       run: sudo apt-get update; sudo apt-get install --no-install-recommends -yq libasound2-dev libudev-dev;
