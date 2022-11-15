@@ -103,11 +103,7 @@ fn handle_imc_event(
             IMCEvent::Load(location) => {
                 let path = location.clone();
 
-                let load_task = thread_pool.spawn(async move {
-                    let file = BufReader::new(File::open(&path)?);
-
-                    MCD::parse_with_dcm(file, path.to_str().unwrap())
-                });
+                let load_task = thread_pool.spawn(async move { MCD::from_path(path)?.with_dcm() });
 
                 commands.spawn(LoadIMC(load_task));
 
@@ -416,7 +412,7 @@ fn apply_classifier(
                     for (entity, imc) in q_imc.iter() {
                         for acquisition in imc.acquisitions_in(region) {
                             let acq_entity = imc
-                                .acquisition_entity(&AcquisitionIdentifier::Id(acquisition.id()))
+                                .acquisition_entity(AcquisitionIdentifier::Id(acquisition.id()))
                                 .unwrap();
 
                             let region = acquisition.pixels_in(region).unwrap();
@@ -710,65 +706,67 @@ fn process_classifier_results(
                         .add_child(pixel_annotation);
                 }
                 ClassifierOutput::File { location } => {
-                    let mut mcd_location = PathBuf::from(acquisition.mcd().location());
-                    mcd_location.set_extension("");
-                    println!("Filename: {:?}", mcd_location.file_name());
+                    if let Some(location) = acquisition.mcd().location() {
+                        let mut mcd_location = PathBuf::from(location);
+                        mcd_location.set_extension("");
+                        println!("Filename: {:?}", mcd_location.file_name());
 
-                    let mut filename: String = mcd_location
-                        .file_name()
-                        .and_then(|s| s.to_str())
-                        .map(|s| s.to_string())
-                        .unwrap();
+                        let mut filename: String = mcd_location
+                            .file_name()
+                            .and_then(|s| s.to_str())
+                            .map(|s| s.to_string())
+                            .unwrap();
 
-                    write!(filename, "_{}", mcd_acquisition.description()).unwrap();
-                    //let output = location.join("path")
+                        write!(filename, "_{}", mcd_acquisition.description()).unwrap();
+                        //let output = location.join("path")
 
-                    if region.x != 0
-                        || region.y != 0
-                        || region.width != acquisition.width() as u32
-                        || region.height != acquisition.height() as u32
-                    {
-                        // A sub region of the acquitision was classified, so include this in the name
-                        write!(
-                            filename,
-                            "_Region_x_{}_{}_y_{}_{}",
-                            region.x,
-                            region.x + region.width,
-                            region.y,
-                            region.y + region.height
-                        )
-                        .unwrap();
-                    }
+                        if region.x != 0
+                            || region.y != 0
+                            || region.width != acquisition.width() as u32
+                            || region.height != acquisition.height() as u32
+                        {
+                            // A sub region of the acquitision was classified, so include this in the name
+                            write!(
+                                filename,
+                                "_Region_x_{}_{}_y_{}_{}",
+                                region.x,
+                                region.x + region.width,
+                                region.y,
+                                region.y + region.height
+                            )
+                            .unwrap();
+                        }
 
-                    let mut data = vec![
-                        vec![0_u8; (region.width * region.height) as usize];
-                        result.labels.len()
-                    ];
+                        let mut data = vec![
+                            vec![0_u8; (region.width * region.height) as usize];
+                            result.labels.len()
+                        ];
 
-                    for (index, label) in result.predicted_labels.iter().enumerate() {
-                        let label = *label as usize;
+                        for (index, label) in result.predicted_labels.iter().enumerate() {
+                            let label = *label as usize;
 
-                        data[label][index] = 255;
-                    }
+                            data[label][index] = 255;
+                        }
 
-                    for (index, label) in result.labels.iter().enumerate() {
-                        let mut filename = filename.clone();
-                        write!(filename, "_{}", label.description).unwrap();
+                        for (index, label) in result.labels.iter().enumerate() {
+                            let mut filename = filename.clone();
+                            write!(filename, "_{}", label.description).unwrap();
 
-                        let mut location = location.join(filename);
-                        location.set_extension("tiff");
+                            let mut location = location.join(filename);
+                            location.set_extension("tiff");
 
-                        let img_file = File::create(location).expect("Cannot find test image!");
-                        let mut writer = BufWriter::new(img_file);
+                            let img_file = File::create(location).expect("Cannot find test image!");
+                            let mut writer = BufWriter::new(img_file);
 
-                        let mut tiff = TiffEncoder::new(&mut writer).unwrap();
+                            let mut tiff = TiffEncoder::new(&mut writer).unwrap();
 
-                        tiff.write_image::<colortype::Gray8>(
-                            region.width,
-                            region.height,
-                            &data[index],
-                        )
-                        .unwrap();
+                            tiff.write_image::<colortype::Gray8>(
+                                region.width,
+                                region.height,
+                                &data[index],
+                            )
+                            .unwrap();
+                        }
                     }
                 }
             }
@@ -777,7 +775,7 @@ fn process_classifier_results(
 }
 
 #[derive(Component)]
-pub(crate) struct LoadIMC(pub Task<Result<MCD<BufReader<File>>, MCDError>>);
+pub(crate) struct LoadIMC(pub Task<Result<MCD<File>, MCDError>>);
 
 #[derive(Component)]
 pub struct Slide {
@@ -789,20 +787,20 @@ pub struct Panorama {}
 
 #[derive(Component, Clone)]
 pub struct Acquisition {
-    mcd: Arc<MCD<BufReader<File>>>,
+    mcd: Arc<MCD<File>>,
     imc_dataset: Entity,
 
     id: u16,
 }
 
 impl Acquisition {
-    fn mcd(&self) -> &MCD<BufReader<File>> {
+    fn mcd(&self) -> &MCD<File> {
         &self.mcd
     }
 
-    fn mcd_acquisition(&self) -> &imc_rs::Acquisition<BufReader<File>> {
+    fn mcd_acquisition(&self) -> &imc_rs::Acquisition<File> {
         self.mcd
-            .acquisition(&AcquisitionIdentifier::Id(self.id))
+            .acquisition(AcquisitionIdentifier::Id(self.id))
             .unwrap()
     }
 
@@ -1121,14 +1119,14 @@ fn load_imc(
                             });
                         })
                         .insert(PrimaryUiEntry {
-                            description: format!("IMC: {}", mcd.location()),
+                            description: format!("IMC: {:?}", mcd.location()),
                         })
                         .insert(IMCDataset {
                             mcd,
                             panoramas,
                             acquisitions: acquisition_entities.into_iter().collect(),
                         })
-                        .insert_bundle(SpatialBundle::default());
+                        .insert(SpatialBundle::default());
                 }
             }
         }
@@ -1159,7 +1157,7 @@ impl ChannelImage {
 
 #[derive(Component, Clone)]
 pub struct IMCDataset {
-    mcd: Arc<MCD<BufReader<File>>>,
+    mcd: Arc<MCD<File>>,
 
     pub panoramas: Vec<Entity>,
     pub acquisitions: HashMap<u16, Entity>,
@@ -1167,23 +1165,26 @@ pub struct IMCDataset {
 
 impl IMCDataset {
     pub fn name(&self) -> &str {
-        self.mcd.location()
+        self.mcd
+            .location()
+            .map(|path| path.to_str().unwrap_or("Unknown name"))
+            .unwrap_or("Unknown name")
     }
 
     pub fn acquisition(
         &self,
-        identifier: &AcquisitionIdentifier,
-    ) -> Option<&imc_rs::Acquisition<BufReader<File>>> {
+        identifier: AcquisitionIdentifier,
+    ) -> Option<&imc_rs::Acquisition<File>> {
         self.mcd.acquisition(identifier)
     }
 
-    pub fn acquisition_entity(&self, identifier: &AcquisitionIdentifier) -> Option<Entity> {
+    pub fn acquisition_entity(&self, identifier: AcquisitionIdentifier) -> Option<Entity> {
         let acquisition = self.mcd.acquisition(identifier)?;
 
         self.acquisitions.get(&acquisition.id()).copied()
     }
 
-    pub fn acquisitions(&self) -> Vec<&imc_rs::Acquisition<BufReader<File>>> {
+    pub fn acquisitions(&self) -> Vec<&imc_rs::Acquisition<File>> {
         self.mcd.acquisitions()
     }
 
@@ -1199,7 +1200,7 @@ impl IMCDataset {
                 Ok(data) => {
                     image_map.insert(acquisition.id(), ChannelImage(data));
                 }
-                Err(MCDError::NoSuchChannel { acquisition: _ }) => {
+                Err(MCDError::InvalidChannel { channel }) => {
                     // No such channel, so we don't add data
                 }
                 _ => todo!(),
@@ -1212,7 +1213,7 @@ impl IMCDataset {
     pub fn acquisitions_in(
         &self,
         region: &imc_rs::BoundingBox<f64>,
-    ) -> Vec<&imc_rs::Acquisition<BufReader<File>>> {
+    ) -> Vec<&imc_rs::Acquisition<File>> {
         self.mcd.acquisitions_in(region)
     }
 }

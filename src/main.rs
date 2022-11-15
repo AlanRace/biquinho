@@ -164,9 +164,7 @@ fn load_test_data(mut commands: Commands) {
     };
 
     let load_task = thread_pool.spawn(async move {
-        let reader = BufReader::new(file);
-
-        let mcd = MCD::parse_with_dcm(reader, path.to_str().unwrap())?;
+        let mcd = MCD::from_path(path)?.with_dcm()?;
 
         // let xml = mcd.xml()?;
         // std::fs::write("mcd.xml", xml);
