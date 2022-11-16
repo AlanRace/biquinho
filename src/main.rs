@@ -88,7 +88,7 @@ fn main() {
     app.add_startup_system(load_test_data)
         .add_startup_system(setup)
         .add_startup_system(set_window_icon)
-        .add_system(print_messages)
+        //.add_system(print_messages)
         .run();
 }
 
