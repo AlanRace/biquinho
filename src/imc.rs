@@ -866,18 +866,18 @@ fn load_imc(
                                         let slide_height = slide.height_in_um() as f32;
 
                                         let image_task = thread_pool.spawn(async move {
-                                            let image = image.as_rgba8().unwrap();
+                                            let image = image.as_rgba8()?;
 
                                             let tile_width = 512;
                                             let tile_height = 512;
 
-                                            ToTileImage {
+                                            Ok(ToTileImage {
                                                 image,
                                                 tile_width,
                                                 tile_height,
                                                 image_width: slide_width,
                                                 image_height: slide_height,
-                                            }
+                                            })
                                         });
 
                                         parent
@@ -895,7 +895,6 @@ fn load_imc(
                                                         slide.width_in_um() as f32,
                                                         slide.height_in_um() as f32,
                                                     ),
-                                                    ..default()
                                                 },
                                                 BoundingBox {
                                                     x: 0.0,
@@ -1060,18 +1059,18 @@ fn load_imc(
                                             // Load in the slide image
                                             if let Some(panorama_image) = panorama.image() {
                                                 let image_task = thread_pool.spawn(async move {
-                                                    let image = panorama_image.as_rgba8().unwrap();
+                                                    let image = panorama_image.as_rgba8()?;
 
                                                     let tile_width = 512;
                                                     let tile_height = 512;
 
-                                                    ToTileImage {
+                                                    Ok(ToTileImage {
                                                         image,
                                                         tile_width,
                                                         tile_height,
                                                         image_width: panorama_dimensions.0 as f32,
                                                         image_height: panorama_dimensions.1 as f32,
-                                                    }
+                                                    })
                                                 });
 
                                                 panorama_commands
