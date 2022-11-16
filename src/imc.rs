@@ -1060,34 +1060,7 @@ fn load_imc(
                                             // Load in the slide image
                                             if let Some(panorama_image) = panorama.image() {
                                                 let image_task = thread_pool.spawn(async move {
-                                                    let image_data =
-                                                        &panorama_image.image_data().unwrap();
-                                                    let image_type =
-                                                        match panorama_image.image_format() {
-                                                            ImageFormat::Png => {
-                                                                ImageType::Extension("png")
-                                                            }
-                                                            ImageFormat::Jpeg => {
-                                                                ImageType::Extension("jpeg")
-                                                            }
-                                                            _ => todo!(),
-                                                        };
-
-                                                    let image =
-                                                        image::load_from_memory_with_format(
-                                                            image_data,
-                                                            panorama_image.image_format(),
-                                                        )
-                                                        .unwrap()
-                                                        .into_rgba8();
-
-                                                    // Image::from_buffer(
-                                                    //     image_data,
-                                                    //     image_type,
-                                                    //     CompressedImageFormats::all(),
-                                                    //     false,
-                                                    // )
-                                                    // .unwrap()
+                                                    let image = panorama_image.as_rgba8().unwrap();
 
                                                     let tile_width = 512;
                                                     let tile_height = 512;
