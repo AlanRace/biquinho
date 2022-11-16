@@ -768,7 +768,7 @@ fn ui_camera_panel(world: &mut World, ui: &mut Ui) {
                             let mut cameras = q_camera.iter(world).collect::<Vec<_>>();
                             cameras.sort_by(|(entity_a, camera_a), (entity_b, camera_b)| {
                                 if camera_a.y == camera_b.y {
-                                    camera_b.y.cmp(&camera_b.y)
+                                    camera_a.x.cmp(&camera_b.x)
                                 } else {
                                     camera_a.y.cmp(&camera_b.y)
                                 }
