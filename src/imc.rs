@@ -1191,8 +1191,16 @@ impl IMCDataset {
         let mut image_map = HashMap::new();
 
         for acquisition in self.mcd.acquisitions() {
-            let data = acquisition.channel_image(identifier, None)?;
-            image_map.insert(acquisition.id(), ChannelImage(data));
+            match acquisition.channel_image(identifier, None) {
+                Ok(data) => {
+                    image_map.insert(acquisition.id(), ChannelImage(data));
+                }
+                Err(MCDError::InvalidChannel { channel: _ }) => {
+                    // This channel doesn't exist for this acquisition (can happen sometimes if the panel was changed),
+                    // so we just ignore this error
+                }
+                Err(error) => return Err(error),
+            }
         }
 
         Ok(image_map)
