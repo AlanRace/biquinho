@@ -99,7 +99,7 @@ fn handle_data_events(
                 );
 
                 let cell_segmentation = commands
-                    .spawn_bundle(SpriteBundle {
+                    .spawn(SpriteBundle {
                         transform: Transform::from_xyz(0.0, 0.0, 1.0),
                         texture: textures.add(image),
                         sprite: Sprite {

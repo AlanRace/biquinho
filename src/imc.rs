@@ -3,7 +3,6 @@ use std::io::BufWriter;
 use std::{
     collections::{HashMap, HashSet},
     fs::File,
-    io::BufReader,
     path::PathBuf,
     sync::Arc,
     time::Instant,
@@ -12,16 +11,12 @@ use std::{
 use bevy::{
     prelude::*,
     reflect::TypeUuid,
-    render::{
-        render_resource::{Extent3d, TextureDimension, TextureFormat},
-        texture::{CompressedImageFormats, ImageType},
-    },
+    render::render_resource::{Extent3d, TextureDimension, TextureFormat},
     sprite::Anchor,
     tasks::{AsyncComputeTaskPool, Task},
 };
 use futures_lite::future;
 
-use image::ImageFormat;
 use nalgebra::Matrix4;
 use tiff::encoder::{colortype, TiffEncoder};
 
@@ -36,7 +31,7 @@ use smartcore::{
 
 use crate::camera::BoundingBox;
 use crate::image_plugin::{
-    ComputeImage, ComputeTileImage, ImageControl, ImageUpdateType, Opacity, TiledImage, ToTileImage,
+    ComputeTileImage, ImageControl, ImageUpdateType, Opacity, TiledImage, ToTileImage,
 };
 use crate::{
     annotation::{Annotation, PixelAnnotationConf},
@@ -628,6 +623,11 @@ fn process_classifier_results(
 
             // TODO: Check error and spawn it if necessary
             if let Err(error) = classifier {
+                commands.spawn(Message {
+                    severity: Severity::Error,
+                    message: format!("Error classifing: {}", error),
+                });
+
                 continue;
             }
 
@@ -644,7 +644,7 @@ fn process_classifier_results(
                     let mut data = vec![0; (region.width * region.height) as usize * 4];
 
                     for (index, label) in result.predicted_labels.iter().enumerate() {
-                        let index = (index * 4) as usize;
+                        let index = index * 4;
 
                         let label = *label as usize;
                         let colour = result.labels[label].colour;
@@ -657,8 +657,8 @@ fn process_classifier_results(
 
                     let image = Image::new(
                         Extent3d {
-                            width: region.width as u32,
-                            height: region.height as u32,
+                            width: region.width,
+                            height: region.height,
                             depth_or_array_layers: 1,
                         },
                         TextureDimension::D2,
@@ -1184,22 +1184,18 @@ impl IMCDataset {
         self.mcd.channels()
     }
 
-    pub fn channel_image(&self, identifier: &ChannelIdentifier) -> HashMap<u16, ChannelImage> {
+    pub fn channel_image(
+        &self,
+        identifier: &ChannelIdentifier,
+    ) -> Result<HashMap<u16, ChannelImage>, MCDError> {
         let mut image_map = HashMap::new();
 
         for acquisition in self.mcd.acquisitions() {
-            match acquisition.channel_image(identifier, None) {
-                Ok(data) => {
-                    image_map.insert(acquisition.id(), ChannelImage(data));
-                }
-                Err(MCDError::InvalidChannel { channel }) => {
-                    // No such channel, so we don't add data
-                }
-                _ => todo!(),
-            }
+            let data = acquisition.channel_image(identifier, None)?;
+            image_map.insert(acquisition.id(), ChannelImage(data));
         }
 
-        image_map
+        Ok(image_map)
     }
 
     pub fn acquisitions_in(
@@ -1404,66 +1400,75 @@ fn generate_channel_image(
 
         if let Ok(imc) = q_imc.get(parent.get()) {
             let start = Instant::now();
-            let mut channel_images = imc.channel_image(&generate.identifier);
 
-            let duration = start.elapsed();
+            match imc.channel_image(&generate.identifier) {
+                Ok(mut channel_images) => {
+                    let duration = start.elapsed();
 
-            println!("Time elapsed loading data is: {:?}", duration);
-            let mut min_value = f32::MAX;
-            let mut max_value = f32::MIN;
-            let mut image_entities = HashSet::with_capacity(channel_images.len());
+                    println!("Time elapsed loading data is: {:?}", duration);
+                    let mut min_value = f32::MAX;
+                    let mut max_value = f32::MIN;
+                    let mut image_entities = HashSet::with_capacity(channel_images.len());
 
-            for (acq_id, acquisition_entity) in image_control.entities.iter() {
-                if let Ok(acquisition) = q_acquisition.get(*acquisition_entity) {
-                    if let Some(channel_image) = channel_images.remove(&acquisition.id) {
-                        // If the image is empty, then we don't need to do anything
-                        if channel_image.width() == 0 || channel_image.height() == 0 {
-                            continue;
+                    for (acq_id, acquisition_entity) in image_control.entities.iter() {
+                        if let Ok(acquisition) = q_acquisition.get(*acquisition_entity) {
+                            if let Some(channel_image) = channel_images.remove(&acquisition.id) {
+                                // If the image is empty, then we don't need to do anything
+                                if channel_image.width() == 0 || channel_image.height() == 0 {
+                                    continue;
+                                }
+
+                                let image_range = channel_image.intensity_range();
+
+                                if image_range.0 < min_value {
+                                    min_value = image_range.0
+                                }
+                                if image_range.0 > max_value {
+                                    max_value = image_range.0
+                                }
+                                if image_range.1 < min_value {
+                                    min_value = image_range.1
+                                }
+                                if image_range.1 > max_value {
+                                    max_value = image_range.1
+                                }
+
+                                let channel_image_entity = commands
+                                    .spawn(AcquisitionChannelImage {
+                                        acquisition_entity: *acquisition_entity,
+                                        data: Some(channel_data.add(channel_image)),
+                                    })
+                                    .id();
+
+                                image_entities.insert(channel_image_entity);
+
+                                commands.entity(entity).add_child(channel_image_entity);
+                            } else {
+                                let channel_image_entity = commands
+                                    .spawn(AcquisitionChannelImage {
+                                        acquisition_entity: *acquisition_entity,
+                                        data: None,
+                                    })
+                                    .id();
+
+                                image_entities.insert(channel_image_entity);
+
+                                commands.entity(entity).add_child(channel_image_entity);
+                            }
                         }
-
-                        let image_range = channel_image.intensity_range();
-
-                        if image_range.0 < min_value {
-                            min_value = image_range.0
-                        }
-                        if image_range.0 > max_value {
-                            max_value = image_range.0
-                        }
-                        if image_range.1 < min_value {
-                            min_value = image_range.1
-                        }
-                        if image_range.1 > max_value {
-                            max_value = image_range.1
-                        }
-
-                        let channel_image_entity = commands
-                            .spawn(AcquisitionChannelImage {
-                                acquisition_entity: *acquisition_entity,
-                                data: Some(channel_data.add(channel_image)),
-                            })
-                            .id();
-
-                        image_entities.insert(channel_image_entity);
-
-                        commands.entity(entity).add_child(channel_image_entity);
-                    } else {
-                        let channel_image_entity = commands
-                            .spawn(AcquisitionChannelImage {
-                                acquisition_entity: *acquisition_entity,
-                                data: None,
-                            })
-                            .id();
-
-                        image_entities.insert(channel_image_entity);
-
-                        commands.entity(entity).add_child(channel_image_entity);
                     }
+
+                    image_control.histogram = vec![];
+                    image_control.intensity_range = (min_value, max_value);
+                    image_control.colour_domain = (min_value, max_value);
+                }
+                Err(error) => {
+                    commands.spawn(Message {
+                        severity: Severity::Error,
+                        message: format!("Failed to load channel data: {}", error),
+                    });
                 }
             }
-
-            image_control.histogram = vec![];
-            image_control.intensity_range = (min_value, max_value);
-            image_control.colour_domain = (min_value, max_value);
         }
     }
 }

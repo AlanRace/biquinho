@@ -1,5 +1,6 @@
 //#![warn(clippy::missing_docs_in_private_items)]
 #![warn(missing_docs)]
+#![warn(clippy::unwrap_used)]
 //! Biquinho - visualisation of imaging mass cytometry data.
 //!
 //! Functionality is split out into separate plugins. This main file deals only with the setup.
@@ -22,7 +23,7 @@
 //! - [ ] Implement means of dragging entire dataset
 //! - [ ] Provide option to load new dataset above loaded datasets
 
-use std::{fs::File, io::BufReader, path::PathBuf};
+use std::{fs::File, path::PathBuf};
 
 /// AnnotationPlugin - handles everything related to drawing, saving and loading annotations.
 mod annotation;
@@ -183,7 +184,7 @@ fn create_transform(
     height: f32,
     flip_required: bool,
 ) -> Transform {
-    let translate_transform = Transform::from_xyz((width / 2.0) as f32, (height / 2.0) as f32, 0.0);
+    let translate_transform = Transform::from_xyz(width / 2.0, height / 2.0, 0.0);
     //let scale_transform = Transform::from_scale(Vec3::new(1.0, 1.0, 0.0));
     let transform = Transform::from_matrix(transform.into());
 
@@ -226,7 +227,7 @@ fn setup(
     for y in 0..=num_gridlines {
         let y_value = (-(num_gridlines / 2) + y) as f32 * grid_spacing;
 
-        commands.spawn_bundle(SpriteBundle {
+        commands.spawn(SpriteBundle {
             transform: Transform::from_xyz(0.0, y_value, 0.0),
             sprite: Sprite {
                 custom_size: Some(Vec2::new(grid_length, grid_thickness)),
@@ -237,7 +238,7 @@ fn setup(
         });
 
         if y_value >= 0.0 {
-            commands.spawn_bundle(Text2dBundle {
+            commands.spawn(Text2dBundle {
                 // Use `Text` directly
                 text: Text {
                     // Construct a `Vec` of `TextSection`s
@@ -264,7 +265,7 @@ fn setup(
     for x in 0..=num_gridlines {
         let x_value = (-(num_gridlines / 2) + x) as f32 * grid_spacing;
 
-        commands.spawn_bundle(SpriteBundle {
+        commands.spawn(SpriteBundle {
             //material: materials.add(Color::rgb(0.5, 0.5, 1.0).into()),
             transform: Transform::from_xyz(x_value, 0.0, 0.0),
             sprite: Sprite {
@@ -277,7 +278,7 @@ fn setup(
 
         if x_value >= 0.0 {
             commands
-            .spawn_bundle(Text2dBundle {
+            .spawn(Text2dBundle {
                 // Use `Text` directly
                 text: Text {
                     // Construct a `Vec` of `TextSection`s
