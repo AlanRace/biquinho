@@ -667,7 +667,7 @@ fn process_classifier_results(
                     );
 
                     let pixel_annotation = commands
-                        .spawn_bundle(SpriteBundle {
+                        .spawn(SpriteBundle {
                             transform: Transform::from_translation(Vec3::new(
                                 (-mcd_acquisition.width() as f32 * 0.5)
                                     + region.x as f32
@@ -1061,8 +1061,8 @@ fn load_imc(
                                                 let image_task = thread_pool.spawn(async move {
                                                     let image = panorama_image.as_rgba8()?;
 
-                                                    let tile_width = 512;
-                                                    let tile_height = 512;
+                                                    let tile_width = 1024;
+                                                    let tile_height = 1024;
 
                                                     Ok(ToTileImage {
                                                         image,
