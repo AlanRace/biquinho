@@ -961,17 +961,17 @@ fn load_imc(
                                             println!("Panorama transform = {:?}", transform);
 
                                             let mut panorama_commands =
-                                                parent.spawn_bundle(SpriteBundle {
+                                                parent.spawn(SpatialBundle {
                                                     //texture: texture_handle,
                                                     transform,
-                                                    sprite: Sprite {
-                                                        custom_size: Some(Vec2::new(
-                                                            panorama_dimensions.0 as f32,
-                                                            panorama_dimensions.1 as f32,
-                                                        )),
-                                                        anchor: Anchor::Center,
-                                                        ..Default::default()
-                                                    },
+                                                    // sprite: Sprite {
+                                                    //     custom_size: Some(Vec2::new(
+                                                    //         panorama_dimensions.0 as f32,
+                                                    //         panorama_dimensions.1 as f32,
+                                                    //     )),
+                                                    //     anchor: Anchor::Center,
+                                                    //     ..Default::default()
+                                                    // },
                                                     ..Default::default()
                                                 });
 
@@ -1024,7 +1024,7 @@ fn load_imc(
                                                         );
 
                                                         let acquisition_entity = parent
-                                                            .spawn_bundle(SpriteBundle {
+                                                            .spawn(SpriteBundle {
                                                                 transform,
                                                                 texture: textures.add(image),
                                                                 sprite: Sprite {
@@ -1073,16 +1073,36 @@ fn load_imc(
                                                             _ => todo!(),
                                                         };
 
-                                                    Image::from_buffer(
-                                                        image_data,
-                                                        image_type,
-                                                        CompressedImageFormats::all(),
-                                                        false,
-                                                    )
-                                                    .unwrap()
+                                                    let image =
+                                                        image::load_from_memory_with_format(
+                                                            image_data,
+                                                            panorama_image.image_format(),
+                                                        )
+                                                        .unwrap()
+                                                        .into_rgba8();
+
+                                                    // Image::from_buffer(
+                                                    //     image_data,
+                                                    //     image_type,
+                                                    //     CompressedImageFormats::all(),
+                                                    //     false,
+                                                    // )
+                                                    // .unwrap()
+
+                                                    let tile_width = 512;
+                                                    let tile_height = 512;
+
+                                                    ToTileImage {
+                                                        image,
+                                                        tile_width,
+                                                        tile_height,
+                                                        image_width: panorama_dimensions.0 as f32,
+                                                        image_height: panorama_dimensions.1 as f32,
+                                                    }
                                                 });
 
-                                                panorama_commands.insert(ComputeImage(image_task));
+                                                panorama_commands
+                                                    .insert(ComputeTileImage(image_task));
                                             }
 
                                             let panorama_entity = panorama_commands.id();

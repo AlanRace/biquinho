@@ -426,8 +426,8 @@ fn update_tiled_image(
 
                     let texture_handle = textures.add(image_texture);
 
-                    let tile_width_um = (tile_width as f32 / to_tile.image.width() as f32)
-                        * to_tile.image_width as f32;
+                    let tile_width_um =
+                        (tile_width as f32 / to_tile.image.width() as f32) * to_tile.image_width;
 
                     let tile_height_um =
                         (tile_height as f32 / to_tile.image.height() as f32) * to_tile.image_height;
@@ -443,7 +443,7 @@ fn update_tiled_image(
                     );
 
                     let tile_entity = commands
-                        .spawn_bundle(SpriteBundle {
+                        .spawn(SpriteBundle {
                             texture: texture_handle,
                             transform,
                             sprite: Sprite {
