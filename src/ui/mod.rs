@@ -524,14 +524,20 @@ fn ui_imc_panel(world: &mut World, ui: &mut Ui) {
                         .num_columns(2)
                         .spacing([40.0, 4.0])
                         .show(ui, |ui| {
-                            ui.label("Background colour");
-                            let mut colour = imc.background_colour().egui();
+                            ui.label("Background opacity");
+                            let mut alpha = imc.background_alpha();
 
-                            if ui.color_edit_button_srgba(&mut colour).changed() {
+                            let opacity = ui.add(
+                                Slider::new(&mut alpha, 0.0..=1.0)
+                                    .step_by(0.01)
+                                    .clamp_to_range(true)
+                                    .orientation(egui::SliderOrientation::Horizontal),
+                            );
+                            if opacity.changed() {
                                 ui_events.push(UiEvent::Data(DataEvent::IMCEvent(
-                                    IMCEvent::SetBackgroundColour {
+                                    IMCEvent::SetBackgroundOpacity {
                                         entity,
-                                        colour: colour.into(),
+                                        opacity: alpha,
                                     },
                                 )));
                             }

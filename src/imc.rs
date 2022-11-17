@@ -16,6 +16,7 @@ use bevy::{
     sprite::Anchor,
     tasks::{AsyncComputeTaskPool, Task},
 };
+use egui::Color32;
 use futures_lite::future;
 
 use nalgebra::Matrix4;
@@ -85,9 +86,9 @@ pub enum IMCEvent {
         output: ClassifierOutput,
     },
 
-    SetBackgroundColour {
+    SetBackgroundOpacity {
         entity: Entity,
-        colour: Colour,
+        opacity: f32,
     },
 
     SetHistogramScale {
@@ -117,9 +118,9 @@ fn handle_imc_event(
 
                 //load_imc(mcd, &mut commands, &mut textures, &thread_pool);
             }
-            IMCEvent::SetBackgroundColour { entity, colour } => {
+            IMCEvent::SetBackgroundOpacity { entity, opacity } => {
                 if let Ok(mut imc) = q_imc.get_mut(*entity) {
-                    imc.background_colour = colour.clone();
+                    imc.background_alpha = *opacity;
                 }
             }
             IMCEvent::SetHistogramScale { entity, scale } => {
@@ -1139,7 +1140,7 @@ fn load_imc(
                         .insert(IMCDataset {
                             mcd,
                             histogram_scale: HistogramScale::None,
-                            background_colour: Colour::Bevy(Color::BLACK),
+                            background_alpha: 1.0,
                             panoramas,
                             acquisitions: acquisition_entities.into_iter().collect(),
                         })
@@ -1185,7 +1186,7 @@ pub struct IMCDataset {
 
     // Settings
     histogram_scale: HistogramScale,
-    background_colour: Colour,
+    background_alpha: f32,
 
     pub panoramas: Vec<Entity>,
     pub acquisitions: HashMap<u16, Entity>,
@@ -1199,8 +1200,8 @@ impl IMCDataset {
             .unwrap_or("Unknown name")
     }
 
-    pub fn background_colour(&self) -> &Colour {
-        &self.background_colour
+    pub fn background_alpha(&self) -> f32 {
+        self.background_alpha
     }
     pub fn histogram_scale(&self) -> &HistogramScale {
         &self.histogram_scale
@@ -1357,87 +1358,110 @@ fn generate_histogram(
     }
 }
 
+// This needs rethinking. Ideally want to generate the mixture between the various
 fn image_control_changed(
-    q_control: Query<(&ImageControl, &Children), Changed<ImageControl>>,
+    q_imc: Query<(&IMCDataset, &Children, ChangeTrackers<IMCDataset>)>,
+    q_control: Query<(&ImageControl, &Children, ChangeTrackers<ImageControl>)>,
     q_acquisition: Query<&Handle<Image>, With<Acquisition>>,
     q_acquisition_images: Query<&AcquisitionChannelImage>,
     channel_data: Res<Assets<ChannelImage>>,
     mut textures: ResMut<Assets<Image>>,
 ) {
-    for (control, children) in q_control.iter() {
-        // Check each AcquisitionChannelImage (child of ImageControl)
-        for child in children.iter() {
-            if let Ok(acq_channel_image) = q_acquisition_images.get(*child) {
-                if let Ok(image) = q_acquisition.get(acq_channel_image.acquisition_entity) {
-                    if let Some(image) = textures.get_mut(image) {
-                        match &acq_channel_image.data {
-                            Some(data) => {
-                                if let Some(channel_image) = channel_data.get(data) {
-                                    for (index, intensity) in
-                                        channel_image.intensities().iter().enumerate()
-                                    {
-                                        let intensity = ((intensity - control.colour_domain.0)
-                                            / (control.colour_domain.1 - control.colour_domain.0)
-                                            * 255.0)
-                                            as u8;
+    for (imc, children, imc_tracker) in q_imc.iter() {
+        let requires_update = imc_tracker.is_changed();
 
-                                        match control.image_update_type {
-                                            ImageUpdateType::Red => {
-                                                image.data[index * 4] = intensity;
-                                            }
-                                            ImageUpdateType::Green => {
-                                                image.data[index * 4 + 1] = intensity;
-                                            }
-                                            ImageUpdateType::Blue => {
-                                                image.data[index * 4 + 2] = intensity;
-                                            }
-                                            ImageUpdateType::All => {
-                                                image.data[index * 4] = intensity;
-                                                image.data[index * 4 + 1] = intensity;
-                                                image.data[index * 4 + 2] = intensity;
+        for (control_index, (control, children, control_tracker)) in q_control.iter().enumerate() {
+            // Check each AcquisitionChannelImage (child of ImageControl)
+
+            if control_tracker.is_changed() || requires_update {
+                info!(
+                    "Channel image updated => recalculating | {:?}",
+                    imc.background_alpha()
+                );
+
+                for child in children.iter() {
+                    if let Ok(acq_channel_image) = q_acquisition_images.get(*child) {
+                        if let Ok(image) = q_acquisition.get(acq_channel_image.acquisition_entity) {
+                            if let Some(image) = textures.get_mut(image) {
+                                match &acq_channel_image.data {
+                                    Some(data) => {
+                                        if let Some(channel_image) = channel_data.get(data) {
+                                            for (index, intensity) in
+                                                channel_image.intensities().iter().enumerate()
+                                            {
+                                                if control_index == 0 {
+                                                    image.data[index * 4 + 3] =
+                                                        (imc.background_alpha() * 255.0) as u8;
+                                                }
+
+                                                let intensity = ((intensity
+                                                    - control.colour_domain.0)
+                                                    / (control.colour_domain.1
+                                                        - control.colour_domain.0)
+                                                    * 255.0)
+                                                    as u8;
+
+                                                if intensity > 0 {
+                                                    match control.image_update_type {
+                                                        ImageUpdateType::Red => {
+                                                            image.data[index * 4] = intensity;
+                                                        }
+                                                        ImageUpdateType::Green => {
+                                                            image.data[index * 4 + 1] = intensity;
+                                                        }
+                                                        ImageUpdateType::Blue => {
+                                                            image.data[index * 4 + 2] = intensity;
+                                                        }
+                                                        ImageUpdateType::All => {
+                                                            image.data[index * 4] = intensity;
+                                                            image.data[index * 4 + 1] = intensity;
+                                                            image.data[index * 4 + 2] = intensity;
+                                                        }
+                                                    }
+
+                                                    // let intensity = image.data[index * 4 + 2]
+                                                    //     .max(image.data[index * 4 + 1])
+                                                    //     .max(image.data[index * 4]);
+                                                    // let alpha = match intensity {
+                                                    //     0..=25 => intensity * 10,
+                                                    //     _ => 255,
+                                                    // };
+
+                                                    // image.data[index * 4 + 3] = alpha;
+                                                    image.data[index * 4 + 3] = 255;
+                                                }
                                             }
                                         }
-
-                                        // let intensity = image.data[index * 4 + 2]
-                                        //     .max(image.data[index * 4 + 1])
-                                        //     .max(image.data[index * 4]);
-                                        // let alpha = match intensity {
-                                        //     0..=25 => intensity * 10,
-                                        //     _ => 255,
-                                        // };
-
-                                        // image.data[index * 4 + 3] = alpha;
-                                        image.data[index * 4 + 3] = 255;
                                     }
-                                }
-                            }
-                            None => {
-                                // There is no data associated with this acquisition, so remove the previous data
-                                for chunk in image.data.chunks_mut(4) {
-                                    match control.image_update_type {
-                                        ImageUpdateType::Red => {
-                                            chunk[0] = 0;
-                                        }
-                                        ImageUpdateType::Green => {
-                                            chunk[1] = 0;
-                                        }
-                                        ImageUpdateType::Blue => {
-                                            chunk[2] = 0;
-                                        }
-                                        ImageUpdateType::All => {
-                                            chunk[0] = 0;
-                                            chunk[1] = 0;
-                                            chunk[2] = 0;
-                                        }
+                                    None => {
+                                        // // There is no data associated with this acquisition, so remove the previous data
+                                        // for chunk in image.data.chunks_mut(4) {
+                                        //     match control.image_update_type {
+                                        //         ImageUpdateType::Red => {
+                                        //             chunk[0] = 0;
+                                        //         }
+                                        //         ImageUpdateType::Green => {
+                                        //             chunk[1] = 0;
+                                        //         }
+                                        //         ImageUpdateType::Blue => {
+                                        //             chunk[2] = 0;
+                                        //         }
+                                        //         ImageUpdateType::All => {
+                                        //             chunk[0] = 0;
+                                        //             chunk[1] = 0;
+                                        //             chunk[2] = 0;
+                                        //         }
+                                        //     }
+
+                                        //     let intensity = chunk[2].max(chunk[1].max(chunk[0]));
+                                        //     let alpha = match intensity {
+                                        //         0..=25 => intensity * 10,
+                                        //         _ => 255,
+                                        //     };
+
+                                        //     chunk[3] = alpha;
+                                        // }
                                     }
-
-                                    let intensity = chunk[2].max(chunk[1].max(chunk[0]));
-                                    let alpha = match intensity {
-                                        0..=25 => intensity * 10,
-                                        _ => 255,
-                                    };
-
-                                    chunk[3] = alpha;
                                 }
                             }
                         }
