@@ -216,7 +216,7 @@ pub enum PixelAnnotationTarget {
 
 #[derive(Component)]
 pub struct GenerateChannelImage {
-    pub identifier: ChannelIdentifier,
+    pub identifier: Option<ChannelIdentifier>,
 }
 
 #[derive(Debug, Clone)]
@@ -1401,33 +1401,33 @@ fn image_control_changed(
                                                     * 255.0)
                                                     as u8;
 
-                                                if intensity > 0 {
-                                                    match control.image_update_type {
-                                                        ImageUpdateType::Red => {
-                                                            image.data[index * 4] = intensity;
-                                                        }
-                                                        ImageUpdateType::Green => {
-                                                            image.data[index * 4 + 1] = intensity;
-                                                        }
-                                                        ImageUpdateType::Blue => {
-                                                            image.data[index * 4 + 2] = intensity;
-                                                        }
-                                                        ImageUpdateType::All => {
-                                                            image.data[index * 4] = intensity;
-                                                            image.data[index * 4 + 1] = intensity;
-                                                            image.data[index * 4 + 2] = intensity;
-                                                        }
+                                                match control.image_update_type {
+                                                    ImageUpdateType::Red => {
+                                                        image.data[index * 4] = intensity;
                                                     }
+                                                    ImageUpdateType::Green => {
+                                                        image.data[index * 4 + 1] = intensity;
+                                                    }
+                                                    ImageUpdateType::Blue => {
+                                                        image.data[index * 4 + 2] = intensity;
+                                                    }
+                                                    ImageUpdateType::All => {
+                                                        image.data[index * 4] = intensity;
+                                                        image.data[index * 4 + 1] = intensity;
+                                                        image.data[index * 4 + 2] = intensity;
+                                                    }
+                                                }
 
-                                                    // let intensity = image.data[index * 4 + 2]
-                                                    //     .max(image.data[index * 4 + 1])
-                                                    //     .max(image.data[index * 4]);
-                                                    // let alpha = match intensity {
-                                                    //     0..=25 => intensity * 10,
-                                                    //     _ => 255,
-                                                    // };
+                                                // let intensity = image.data[index * 4 + 2]
+                                                //     .max(image.data[index * 4 + 1])
+                                                //     .max(image.data[index * 4]);
+                                                // let alpha = match intensity {
+                                                //     0..=25 => intensity * 10,
+                                                //     _ => 255,
+                                                // };
 
-                                                    // image.data[index * 4 + 3] = alpha;
+                                                // image.data[index * 4 + 3] = alpha;
+                                                if intensity > 0 {
                                                     image.data[index * 4 + 3] = 255;
                                                 }
                                             }
@@ -1490,10 +1490,21 @@ fn generate_channel_image(
         // Remove children from the image control (previously loaded data)
         commands.entity(entity).despawn_descendants();
 
+        // We are generating the channel image, so we can remove this
+        commands.entity(entity).remove::<GenerateChannelImage>();
+
         if let Ok(imc) = q_imc.get(parent.get()) {
             let start = Instant::now();
 
-            match imc.channel_image(&generate.identifier) {
+            let Some(identifier) = &generate.identifier else {
+                image_control.histogram = vec![];
+                image_control.intensity_range = (0.0, f32::INFINITY);
+                image_control.colour_domain = (0.0, f32::INFINITY);
+
+                continue;
+            };
+
+            match imc.channel_image(identifier) {
                 Ok(mut channel_images) => {
                     let duration = start.elapsed();
 
@@ -1562,8 +1573,5 @@ fn generate_channel_image(
                 }
             }
         }
-
-        // We are finished with generating the channel image, so we can remove this
-        commands.entity(entity).remove::<GenerateChannelImage>();
     }
 }

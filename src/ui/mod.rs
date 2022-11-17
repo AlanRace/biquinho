@@ -594,16 +594,35 @@ fn ui_imc_panel(world: &mut World, ui: &mut Ui) {
                                 .spacing([40.0, 4.0])
                                 .show(ui, |ui| {
                                     ui.add(Label::new(&control.description));
+
+                                    let selected_text = if *selection == 0 {
+                                        "None"
+                                    } else if channels[*selection - 1].label().trim().is_empty() {
+                                        channels[*selection - 1].name()
+                                    } else {
+                                        channels[*selection - 1].label()
+                                    };
+
                                     egui::ComboBox::from_id_source(control_entity)
-                                        .selected_text(channels[*selection].label().to_string())
+                                        .width(100.0)
+                                        .selected_text(selected_text)
                                         .show_ui(ui, |ui| {
+                                            if ui.selectable_value(selection, 0, "None").clicked() {
+                                                generation_events.push((
+                                                    control_entity,
+                                                    GenerateChannelImage { identifier: None },
+                                                ));
+                                            }
+
                                             for (index, channel) in channels.iter().enumerate() {
+                                                let name = if channel.label().trim().is_empty() {
+                                                    channel.name()
+                                                } else {
+                                                    channel.label()
+                                                };
+
                                                 if ui
-                                                    .selectable_value(
-                                                        selection,
-                                                        index,
-                                                        channel.label(),
-                                                    )
+                                                    .selectable_value(selection, index + 1, name)
                                                     .clicked()
                                                 {
                                                     // TODO: Send out event that we should generate ion image
@@ -618,8 +637,10 @@ fn ui_imc_panel(world: &mut World, ui: &mut Ui) {
                                                     generation_events.push((
                                                         control_entity,
                                                         GenerateChannelImage {
-                                                            identifier: ChannelIdentifier::Name(
-                                                                channel.name().into(),
+                                                            identifier: Some(
+                                                                ChannelIdentifier::Name(
+                                                                    channel.name().into(),
+                                                                ),
                                                             ),
                                                         },
                                                     ));
