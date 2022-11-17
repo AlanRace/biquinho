@@ -230,7 +230,7 @@ fn ui_classification_window(
                                     }
                                 }
 
-                                show_color(ui, annotation.egui_colour(), egui::Vec2::splat(16.0));
+                                show_color(ui, annotation.colour().egui(), egui::Vec2::splat(16.0));
                             });
 
                             if index % 3 == 2 {

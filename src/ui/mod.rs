@@ -120,6 +120,7 @@ enum UiIcon {
     Edit,
     EditOff,
     FolderOpen,
+    Microscope,
 }
 
 impl UiIcon {
@@ -132,6 +133,7 @@ impl UiIcon {
             UiIcon::Edit => "icons/edit_16px.png",
             UiIcon::EditOff => "icons/edit_off_16px.png",
             UiIcon::FolderOpen => "icons/folder_open_16px.png",
+            UiIcon::Microscope => "icons/biotech_64px.png",
         }
     }
 }
@@ -298,6 +300,7 @@ impl FromWorld for UiState {
         ui_state.load_icon(&mut asset_server, UiIcon::Edit);
         ui_state.load_icon(&mut asset_server, UiIcon::EditOff);
         ui_state.load_icon(&mut asset_server, UiIcon::FolderOpen);
+        ui_state.load_icon(&mut asset_server, UiIcon::Microscope);
 
         let mut egui_ctx = world.get_resource_mut::<EguiContext>().unwrap();
         for (icon, handle) in &ui_state.bevy_icons {
@@ -469,127 +472,168 @@ fn ui_right_panel_exclusive(world: &mut World) {
 }
 
 fn ui_imc_panel(world: &mut World, ui: &mut Ui) {
-    let mut q_imc = world.query::<(&IMCDataset, &Children)>();
+    let mut q_imc = world.query::<(Entity, &IMCDataset, &Children)>();
     // let commands = world.co
 
     let mut ui_events = Vec::new();
     let mut generation_events = Vec::new();
 
     world.resource_scope(|world: &mut World, mut ui_state: Mut<UiState>| {
-        for (imc, children) in q_imc.iter(world) {
-            ui.heading(format!("IMC {}", imc.name()));
+        for (entity, imc, children) in q_imc.iter(world) {
+            // ui.collapsing(heading, add_contents);
 
-            // IMCGrid::new().ui(ui, imc, children, &mut ui_events);
+            let id = ui.make_persistent_id(format!("header_for_{:?}", entity));
 
-            for child in children.iter() {
-                let control = world.get::<ImageControl>(*child);
+            egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), id, true)
+                .show_header(ui, |ui| {
+                    ui.image(
+                        ui_state.icon(UiIcon::Microscope),
+                        egui::Vec2::splat(ui_state.icon_size),
+                    );
 
-                if let Some(control) = control {
-                    let control_entity = *child;
+                    ui.label(imc.name());
+                    // ui.heading(format!("IMC {}", imc.name()));
 
-                    let selection = ui_state
-                        .combo_box_selection
-                        .entry(control_entity)
-                        .or_insert(0);
+                    // ui.with_layout(egui::Layout::left_to_right(egui::Align::Min), |ui| {
+                    //     let width = side_panel_size.x - 80.0;
+                    //     let char_width = 6.0;
+                    //     let num_chars =
+                    //         ((width / char_width).floor() as usize).min(description.len());
 
-                    let channels = imc.channels();
+                    //     ui.add_sized(
+                    //         [num_chars as f32 * char_width, 10.0],
+                    //         egui::Label::new(&description[..num_chars]),
+                    //     );
 
-                    egui::Grid::new(format!("{}_{:?}", "marker_grid", control_entity))
-                        .num_columns(2)
-                        .spacing([40.0, 4.0])
-                        .show(ui, |ui| {
-                            ui.add(Label::new(&control.description));
-                            egui::ComboBox::from_id_source(control_entity)
-                                .selected_text(channels[*selection].label().to_string())
-                                .show_ui(ui, |ui| {
-                                    for (index, channel) in channels.iter().enumerate() {
-                                        if ui
-                                            .selectable_value(selection, index, channel.label())
-                                            .clicked()
-                                        {
-                                            // TODO: Send out event that we should generate ion image
-                                            println!("Selected {}", channel.name());
-                                            // world.entity_mut(control_entity).insert(
-                                            //     GenerateChannelImage {
-                                            //         identifier: ChannelIdentifier::Name(
-                                            //             channel.name().into(),
-                                            //         ),
-                                            //     },
-                                            // );
-                                            generation_events.push((
-                                                control_entity,
-                                                GenerateChannelImage {
-                                                    identifier: ChannelIdentifier::Name(
-                                                        channel.name().into(),
-                                                    ),
-                                                },
-                                            ));
-                                        }
-                                    }
+                    //     ui.style_mut().visuals.override_text_color = Some(Color32::RED);
+                    //     let close_response = ui.button("X").on_hover_text(
+                    //         "Close the data, removing it and any children from the interface.",
+                    //     );
+
+                    //     if close_response.clicked() {
+                    //         // world.send_event(UiEvent::Data(DataEvent::CloseData(entity)));
+                    //         events.push(UiEvent::Data(DataEvent::CloseData(entity)));
+                    //     }
+                    // });
+                })
+                .body(|ui| {
+                    // IMCGrid::new().ui(ui, imc, children, &mut ui_events);
+
+                    for child in children.iter() {
+                        let control = world.get::<ImageControl>(*child);
+
+                        if let Some(control) = control {
+                            let control_entity = *child;
+
+                            let selection = ui_state
+                                .combo_box_selection
+                                .entry(control_entity)
+                                .or_insert(0);
+
+                            let channels = imc.channels();
+
+                            egui::Grid::new(format!("{}_{:?}", "marker_grid", control_entity))
+                                .num_columns(2)
+                                .spacing([40.0, 4.0])
+                                .show(ui, |ui| {
+                                    ui.add(Label::new(&control.description));
+                                    egui::ComboBox::from_id_source(control_entity)
+                                        .selected_text(channels[*selection].label().to_string())
+                                        .show_ui(ui, |ui| {
+                                            for (index, channel) in channels.iter().enumerate() {
+                                                if ui
+                                                    .selectable_value(
+                                                        selection,
+                                                        index,
+                                                        channel.label(),
+                                                    )
+                                                    .clicked()
+                                                {
+                                                    // TODO: Send out event that we should generate ion image
+                                                    println!("Selected {}", channel.name());
+                                                    // world.entity_mut(control_entity).insert(
+                                                    //     GenerateChannelImage {
+                                                    //         identifier: ChannelIdentifier::Name(
+                                                    //             channel.name().into(),
+                                                    //         ),
+                                                    //     },
+                                                    // );
+                                                    generation_events.push((
+                                                        control_entity,
+                                                        GenerateChannelImage {
+                                                            identifier: ChannelIdentifier::Name(
+                                                                channel.name().into(),
+                                                            ),
+                                                        },
+                                                    ));
+                                                }
+                                            }
+                                        });
                                 });
-                        });
 
-                    let intensity_range = control.intensity_range;
+                            let intensity_range = control.intensity_range;
 
-                    if !control.histogram.is_empty() {
-                        let num_bins = control.histogram.len();
+                            if !control.histogram.is_empty() {
+                                let num_bins = control.histogram.len();
 
-                        let bin_size =
-                            (intensity_range.1 - intensity_range.0) / (num_bins - 1) as f32;
+                                let bin_size =
+                                    (intensity_range.1 - intensity_range.0) / (num_bins - 1) as f32;
 
-                        let chart = BarChart::new(
-                            (0..num_bins)
-                                .map(|x| {
-                                    Bar::new(
-                                        (x as f32 * bin_size + control.intensity_range.0) as f64,
-                                        (control.histogram[x] as f64 + 1.0).log10(),
-                                    )
-                                    .width(bin_size as f64)
-                                })
-                                .collect(),
-                        )
-                        .color(Color32::LIGHT_BLUE);
+                                let chart = BarChart::new(
+                                    (0..num_bins)
+                                        .map(|x| {
+                                            Bar::new(
+                                                (x as f32 * bin_size + control.intensity_range.0)
+                                                    as f64,
+                                                (control.histogram[x] as f64 + 1.0), //.log10()
+                                            )
+                                            .width(bin_size as f64)
+                                        })
+                                        .collect(),
+                                )
+                                .color(Color32::LIGHT_BLUE);
 
-                        Plot::new(format!("{}_{:?}", "histogram", control_entity))
-                            .height(75.0)
-                            .show(ui, |plot_ui| plot_ui.bar_chart(chart));
-                    }
+                                Plot::new(format!("{}_{:?}", "histogram", control_entity))
+                                    .height(75.0)
+                                    .show(ui, |plot_ui| plot_ui.bar_chart(chart));
+                            }
 
-                    let mut min_value = control.colour_domain.0;
+                            let mut min_value = control.colour_domain.0;
 
-                    let min_value_response = ui.add(
-                        Slider::new(&mut min_value, intensity_range.0..=intensity_range.1)
-                            .clamp_to_range(true)
-                            .smart_aim(false)
-                            .orientation(egui::SliderOrientation::Horizontal)
-                            .text("Min"),
-                    );
+                            let min_value_response = ui.add(
+                                Slider::new(&mut min_value, intensity_range.0..=intensity_range.1)
+                                    .clamp_to_range(true)
+                                    .smart_aim(false)
+                                    .orientation(egui::SliderOrientation::Horizontal)
+                                    .text("Min"),
+                            );
 
-                    let mut max_value = control.colour_domain.1;
+                            let mut max_value = control.colour_domain.1;
 
-                    let max_value_response = ui.add(
-                        Slider::new(&mut max_value, intensity_range.0..=intensity_range.1)
-                            .clamp_to_range(true)
-                            .smart_aim(false)
-                            .orientation(egui::SliderOrientation::Horizontal)
-                            .text("Max"),
-                    );
+                            let max_value_response = ui.add(
+                                Slider::new(&mut max_value, intensity_range.0..=intensity_range.1)
+                                    .clamp_to_range(true)
+                                    .smart_aim(false)
+                                    .orientation(egui::SliderOrientation::Horizontal)
+                                    .text("Max"),
+                            );
 
-                    if min_value_response.changed() || max_value_response.changed() {
-                        if min_value > max_value {
-                            min_value = max_value;
+                            if min_value_response.changed() || max_value_response.changed() {
+                                if min_value > max_value {
+                                    min_value = max_value;
+                                }
+
+                                // Avoid double sending the event due to delay in event propagation
+                                ui_events.push(UiEvent::Image(ImageEvent::SetColourDomain(
+                                    control_entity,
+                                    (min_value, max_value),
+                                )));
+                            }
+
+                            ui.separator();
                         }
-
-                        // Avoid double sending the event due to delay in event propagation
-                        ui_events.push(UiEvent::Image(ImageEvent::SetColourDomain(
-                            control_entity,
-                            (min_value, max_value),
-                        )));
                     }
-
-                    ui.separator();
-                }
-            }
+                });
         }
     });
 

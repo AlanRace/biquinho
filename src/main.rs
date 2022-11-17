@@ -29,6 +29,7 @@ use std::{fs::File, path::PathBuf};
 mod annotation;
 /// CameraPlugin - handles viewing data view one or more cameras and selecting and dragging objects viewed in the camera.
 mod camera;
+mod colour;
 mod data;
 // mod geometry;
 /// ImagePlugin - handles loading and viewing image data (including channel images).

@@ -42,12 +42,12 @@ pub(super) fn create_annotation_ui(world: &mut World, ui: &mut Ui) {
                     } else {
                         ui.label(annotation.description.to_string());
                     }
-                    let mut colour = annotation.egui_colour();
+                    let mut colour = annotation.colour().egui();
 
                     if ui.color_edit_button_srgba(&mut colour).changed() {
                         ui_events.push(UiEvent::Annotation(AnnotationEvent::SetColour {
                             entity: pencil_entity,
-                            colour,
+                            colour: colour.into(),
                         }));
                     }
 
@@ -212,9 +212,9 @@ pub(super) fn create_annotation_ui(world: &mut World, ui: &mut Ui) {
                             .get_string("annotation_name")
                             .expect("We have already added the string with name 'annotation_name'")
                             .to_string(),
-                        colour: *ui_state.get_colour("annotation_colour").expect(
+                        colour: ui_state.get_colour("annotation_colour").expect(
                             "We have already added the colour with identifier 'annotation_colour'",
-                        ),
+                        ).into(),
                     }));
                 }
 

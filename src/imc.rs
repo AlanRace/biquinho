@@ -31,6 +31,7 @@ use smartcore::{
 };
 
 use crate::camera::BoundingBox;
+use crate::colour::Colour;
 use crate::image_plugin::{
     ComputeTileImage, ImageControl, ImageUpdateType, Opacity, TiledImage, ToTileImage,
 };
@@ -217,7 +218,7 @@ fn create_labelled_data(
         label_colours.push(Label {
             description: annotation.description.clone(),
             value: label_index as f32,
-            colour: annotation.bevy_colour(),
+            colour: annotation.colour().bevy(),
         });
 
         for (acquisition, transform) in acquisitions.iter() {
@@ -1116,6 +1117,8 @@ fn load_imc(
                         })
                         .insert(IMCDataset {
                             mcd,
+                            histogram_scale: HistogramScale::None,
+                            background_colour: Colour::Bevy(Color::BLACK),
                             panoramas,
                             acquisitions: acquisition_entities.into_iter().collect(),
                         })
@@ -1148,9 +1151,20 @@ pub struct ChannelImage(imc_rs::ChannelImage);
 //     }
 // }
 
+#[derive(Debug, Clone)]
+pub enum HistogramScale {
+    None,
+    Log10,
+    Ln,
+}
+
 #[derive(Component, Clone)]
 pub struct IMCDataset {
     mcd: Arc<MCD<File>>,
+
+    // Settings
+    histogram_scale: HistogramScale,
+    background_colour: Colour,
 
     pub panoramas: Vec<Entity>,
     pub acquisitions: HashMap<u16, Entity>,

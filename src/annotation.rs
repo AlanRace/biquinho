@@ -14,7 +14,7 @@ use geo_booleanop::boolean::BooleanOp;
 use geo_types::{LineString, MultiPolygon, Polygon};
 use serde::{Deserialize, Serialize};
 
-use crate::{camera::MousePosition, ui::Editing, Message};
+use crate::{camera::MousePosition, colour::Colour, ui::Editing, Message};
 
 /// AnnotationPlugin
 ///
@@ -45,7 +45,7 @@ pub enum AnnotationEvent {
         /// Name of the annotation.
         name: String,
         /// Representative colour for the annotation.
-        colour: Color32,
+        colour: Colour,
     },
     /// Remove the annotation with the given [`Entity`].
     Remove(Entity),
@@ -77,7 +77,7 @@ pub enum AnnotationEvent {
         /// Annotation whose colour should be altered.
         entity: Entity,
         /// New representative colour to use for this annotation.
-        colour: Color32,
+        colour: Colour,
     },
     /// Set the description of the annotation with the given [`Entity`].
     SetDescription {
@@ -110,8 +110,8 @@ fn handle_annotation_event(
         match event {
             AnnotationEvent::Add { name, colour } => {
                 commands
-                    .spawn_bundle(SpatialBundle::default())
-                    .insert(Annotation::with_egui_colour(name, *colour));
+                    .spawn(SpatialBundle::default())
+                    .insert(Annotation::new(name, colour.clone()));
             }
             AnnotationEvent::Remove(entity) => {
                 commands.entity(*entity).despawn_recursive();
@@ -203,24 +203,24 @@ fn handle_annotation_event(
             }
             AnnotationEvent::SetColour { entity, colour } => {
                 if let Ok((_, mut annotation, children, _)) = q_annotations.get_mut(*entity) {
-                    annotation.colour = *colour;
+                    annotation.colour = colour.clone();
 
                     if let Some(children) = children {
                         for child in children.iter() {
                             if let Ok(mut draw_mode) = q_draw_mode.get_mut(*child) {
                                 match draw_mode.as_mut() {
-                                    DrawMode::Fill(fill) => fill.color = annotation.bevy_colour(),
+                                    DrawMode::Fill(fill) => fill.color = annotation.colour().bevy(),
                                     DrawMode::Stroke(stroke) => {
-                                        stroke.color = annotation.bevy_colour()
+                                        stroke.color = annotation.colour().bevy()
                                     }
                                     DrawMode::Outlined {
                                         fill_mode,
                                         outline_mode,
                                     } => {
-                                        let mut colour = annotation.bevy_colour();
+                                        let mut colour = annotation.colour().bevy();
                                         colour.set_a(1.0);
 
-                                        fill_mode.color = annotation.bevy_colour();
+                                        fill_mode.color = annotation.colour().bevy();
                                         outline_mode.color = colour;
                                     }
                                 }
@@ -391,7 +391,7 @@ pub struct PixelAnnotationConf<'s> {
 #[derive(Component, Clone, Serialize, Deserialize)]
 pub struct Annotation {
     pub(crate) description: String,
-    pub(crate) colour: Color32,
+    pub(crate) colour: Colour,
 
     outline: f32,
     //pub(crate) annotation_type: AnnotationType,
@@ -406,10 +406,10 @@ pub struct Annotation {
 }
 
 impl Annotation {
-    pub fn with_egui_colour(description: &str, colour: Color32) -> Self {
+    pub fn new<C: Into<Colour>>(description: &str, colour: C) -> Self {
         Self {
             description: description.to_string(),
-            colour,
+            colour: colour.into(),
             outline: 5.0,
             polygon: MultiPolygon::new(vec![]),
             active_tool: None,
@@ -418,35 +418,51 @@ impl Annotation {
         }
     }
 
-    pub fn with_bevy_colour(description: &str, colour: Color) -> Self {
-        Self {
-            description: description.to_string(),
-            colour: Color32::from_rgba_premultiplied(
-                (colour.r() * 255.0) as u8,
-                (colour.g() * 255.0) as u8,
-                (colour.b() * 255.0) as u8,
-                (colour.a() * 255.0) as u8,
-            ),
-            outline: 5.0,
-            polygon: MultiPolygon::new(vec![]),
-            active_tool: None,
-            last_pixel: None,
-            editing_camera: None,
-        }
+    pub fn colour(&self) -> &Colour {
+        &self.colour
     }
 
-    pub fn bevy_colour(&self) -> Color {
-        Color::rgba_u8(
-            self.colour.r(),
-            self.colour.g(),
-            self.colour.b(),
-            self.colour.a(),
-        )
-    }
+    // pub fn with_egui_colour(description: &str, colour: Color32) -> Self {
+    //     Self {
+    //         description: description.to_string(),
+    //         colour,
+    //         outline: 5.0,
+    //         polygon: MultiPolygon::new(vec![]),
+    //         active_tool: None,
+    //         last_pixel: None,
+    //         editing_camera: None,
+    //     }
+    // }
 
-    pub fn egui_colour(&self) -> Color32 {
-        self.colour
-    }
+    // pub fn with_bevy_colour(description: &str, colour: Color) -> Self {
+    //     Self {
+    //         description: description.to_string(),
+    //         colour: Color32::from_rgba_premultiplied(
+    //             (colour.r() * 255.0) as u8,
+    //             (colour.g() * 255.0) as u8,
+    //             (colour.b() * 255.0) as u8,
+    //             (colour.a() * 255.0) as u8,
+    //         ),
+    //         outline: 5.0,
+    //         polygon: MultiPolygon::new(vec![]),
+    //         active_tool: None,
+    //         last_pixel: None,
+    //         editing_camera: None,
+    //     }
+    // }
+
+    // pub fn bevy_colour(&self) -> Color {
+    //     Color::rgba_u8(
+    //         self.colour.r(),
+    //         self.colour.g(),
+    //         self.colour.b(),
+    //         self.colour.a(),
+    //     )
+    // }
+
+    // pub fn egui_colour(&self) -> Color32 {
+    //     self.colour
+    // }
 
     pub fn description(&self) -> &str {
         &self.description
@@ -766,13 +782,13 @@ fn update_annotation(
 
                 let path = builder.build();
 
-                let mut colour = annotation.bevy_colour();
+                let mut colour = annotation.colour().bevy();
                 colour.set_a(1.0);
 
                 parent.spawn(GeometryBuilder::build_as(
                     &path,
                     DrawMode::Outlined {
-                        fill_mode: FillMode::color(annotation.bevy_colour()),
+                        fill_mode: FillMode::color(annotation.colour().bevy()),
                         outline_mode: StrokeMode {
                             options: StrokeOptions::default().with_line_width(annotation.outline),
                             color: colour, //Color::BLACK,
@@ -819,7 +835,7 @@ fn annotation_hint(
                     );
                     let path = builder.build();
 
-                    let mut colour = annotation.bevy_colour();
+                    let mut colour = annotation.colour().bevy();
                     colour.set_a(0.25);
 
                     commands.spawn((
@@ -830,7 +846,7 @@ fn annotation_hint(
                                 outline_mode: StrokeMode {
                                     options: StrokeOptions::default()
                                         .with_line_width(radius / 20.0),
-                                    color: annotation.bevy_colour(), //Color::BLACK,
+                                    color: annotation.colour().bevy(), //Color::BLACK,
                                 },
                             },
                             Transform::from_xyz(current_world.x, current_world.y, 100.0),
