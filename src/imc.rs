@@ -84,6 +84,16 @@ pub enum IMCEvent {
         channels: Vec<ChannelIdentifier>,
         output: ClassifierOutput,
     },
+
+    SetBackgroundColour {
+        entity: Entity,
+        colour: Colour,
+    },
+
+    SetHistogramScale {
+        entity: Entity,
+        scale: HistogramScale,
+    },
 }
 
 /// Handle all `IMCEvent`s
@@ -91,6 +101,7 @@ fn handle_imc_event(
     mut commands: Commands,
     mut events: EventReader<IMCEvent>,
     q_acquisitions: Query<(Entity, &Acquisition, &GlobalTransform)>,
+    mut q_imc: Query<&mut IMCDataset>,
     q_annotations: Query<(Entity, &Annotation)>,
 ) {
     let thread_pool = AsyncComputeTaskPool::get();
@@ -105,6 +116,16 @@ fn handle_imc_event(
                 commands.spawn(LoadIMC(load_task));
 
                 //load_imc(mcd, &mut commands, &mut textures, &thread_pool);
+            }
+            IMCEvent::SetBackgroundColour { entity, colour } => {
+                if let Ok(mut imc) = q_imc.get_mut(*entity) {
+                    imc.background_colour = colour.clone();
+                }
+            }
+            IMCEvent::SetHistogramScale { entity, scale } => {
+                if let Ok(mut imc) = q_imc.get_mut(*entity) {
+                    imc.histogram_scale = *scale;
+                }
             }
             IMCEvent::GeneratePixelAnnotation {
                 labels,
@@ -1151,7 +1172,7 @@ pub struct ChannelImage(imc_rs::ChannelImage);
 //     }
 // }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HistogramScale {
     None,
     Log10,
@@ -1176,6 +1197,13 @@ impl IMCDataset {
             .location()
             .map(|path| path.to_str().unwrap_or("Unknown name"))
             .unwrap_or("Unknown name")
+    }
+
+    pub fn background_colour(&self) -> &Colour {
+        &self.background_colour
+    }
+    pub fn histogram_scale(&self) -> &HistogramScale {
+        &self.histogram_scale
     }
 
     pub fn acquisition(

@@ -20,7 +20,7 @@ use crate::{
     },
     data::{CellSegmentation, DataEvent},
     image_plugin::{ImageControl, ImageEvent, Opacity},
-    imc::{Acquisition, GenerateChannelImage, IMCDataset, LoadIMC},
+    imc::{Acquisition, GenerateChannelImage, HistogramScale, IMCDataset, IMCEvent, LoadIMC},
     Message,
 };
 
@@ -519,6 +519,57 @@ fn ui_imc_panel(world: &mut World, ui: &mut Ui) {
                 .body(|ui| {
                     // IMCGrid::new().ui(ui, imc, children, &mut ui_events);
 
+                    // General IMC contols
+                    egui::Grid::new(format!("{}_{:?}", "imc_controls", entity))
+                        .num_columns(2)
+                        .spacing([40.0, 4.0])
+                        .show(ui, |ui| {
+                            ui.label("Background colour");
+                            let mut colour = imc.background_colour().egui();
+
+                            if ui.color_edit_button_srgba(&mut colour).changed() {
+                                ui_events.push(UiEvent::Data(DataEvent::IMCEvent(
+                                    IMCEvent::SetBackgroundColour {
+                                        entity,
+                                        colour: colour.into(),
+                                    },
+                                )));
+                            }
+
+                            ui.end_row();
+
+                            let mut histogram_scale = *imc.histogram_scale();
+                            ui.label("Histogram scaling");
+
+                            egui::ComboBox::from_id_source(format!(
+                                "{}_{:?}",
+                                "histogram_scale", entity
+                            ))
+                            .selected_text(format!("{:?}", histogram_scale))
+                            .show_ui(ui, |ui| {
+                                ui.selectable_value(
+                                    &mut histogram_scale,
+                                    HistogramScale::None,
+                                    "None",
+                                );
+                                ui.selectable_value(
+                                    &mut histogram_scale,
+                                    HistogramScale::Log10,
+                                    "log10",
+                                );
+                                ui.selectable_value(&mut histogram_scale, HistogramScale::Ln, "ln");
+                            });
+
+                            if histogram_scale != *imc.histogram_scale() {
+                                ui_events.push(UiEvent::Data(DataEvent::IMCEvent(
+                                    IMCEvent::SetHistogramScale {
+                                        entity,
+                                        scale: histogram_scale,
+                                    },
+                                )));
+                            }
+                        });
+
                     for child in children.iter() {
                         let control = world.get::<ImageControl>(*child);
 
@@ -585,7 +636,17 @@ fn ui_imc_panel(world: &mut World, ui: &mut Ui) {
                                             Bar::new(
                                                 (x as f32 * bin_size + control.intensity_range.0)
                                                     as f64,
-                                                (control.histogram[x] as f64 + 1.0), //.log10()
+                                                match imc.histogram_scale() {
+                                                    HistogramScale::None => {
+                                                        control.histogram[x] as f64
+                                                    }
+                                                    HistogramScale::Log10 => {
+                                                        (control.histogram[x] as f64 + 1.0).log10()
+                                                    }
+                                                    HistogramScale::Ln => {
+                                                        (control.histogram[x] as f64 + 1.0).ln()
+                                                    }
+                                                },
                                             )
                                             .width(bin_size as f64)
                                         })
