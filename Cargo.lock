@@ -2071,6 +2071,8 @@ dependencies = [
 [[package]]
 name = "imc-rs"
 version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0598848515ada2541fb4d9588534f8777a43ad4acddc3fc8229bf9b9d7215cc1"
 dependencies = [
  "byteorder",
  "csv",
