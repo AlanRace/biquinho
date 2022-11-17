@@ -38,7 +38,7 @@ smartcore = "0.2.1"
 futures-lite = "1.11.3"
 
 # IMC specific crates
-imc-rs = {version = "0.1", optional = true}
+imc-rs = {path = "../imc-rs/lib", optional = true} # {version = "0.1", optional = true}
 
 [features]
 default = ["imc"]

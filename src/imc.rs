@@ -1,5 +1,6 @@
 use std::fmt::Write;
 use std::io::BufWriter;
+use std::ops::Deref;
 use std::{
     collections::{HashMap, HashSet},
     fs::File,
@@ -59,9 +60,9 @@ impl Plugin for IMCPlugin {
             .add_system(load_imc)
             .add_system(apply_classifier)
             .add_system(process_classifier_results)
-            .add_system(generate_channel_image)
-            .add_system(generate_histogram)
-            .add_system(image_control_changed);
+            .add_system(generate_channel_image.label("GenerateImage"))
+            .add_system(generate_histogram.before("GenerateImage")) // This has to be before -> I think entities are despawned at the end of the frame. If this is set to after, then it tries to generate the wrong histogram
+            .add_system(image_control_changed.after("GenerateImage"));
     }
 }
 
@@ -1125,27 +1126,27 @@ fn load_imc(
     }
 }
 
-#[derive(TypeUuid)]
+#[derive(TypeUuid, Deref)]
 #[uuid = "7c9402ad-cf99-4fe9-87a9-f8f45cdc8a2b"]
 pub struct ChannelImage(imc_rs::ChannelImage);
 
-impl ChannelImage {
-    pub fn width(&self) -> usize {
-        self.0.width() as usize
-    }
+// impl ChannelImage {
+//     pub fn width(&self) -> usize {
+//         self.0.width() as usize
+//     }
 
-    pub fn height(&self) -> usize {
-        self.0.height() as usize
-    }
+//     pub fn height(&self) -> usize {
+//         self.0.height() as usize
+//     }
 
-    pub fn intensity_range(&self) -> (f32, f32) {
-        self.0.intensity_range()
-    }
+//     pub fn intensity_range(&self) -> (f32, f32) {
+//         self.0.intensity_range()
+//     }
 
-    pub fn intensities(&self) -> &[f32] {
-        self.0.intensities()
-    }
-}
+//     pub fn intensities(&self) -> &[f32] {
+//         self.0.intensities()
+//     }
+// }
 
 #[derive(Component, Clone)]
 pub struct IMCDataset {
@@ -1248,7 +1249,7 @@ struct AcquisitionChannelImage {
 // TODO: Should this be part of the ImagePlugin?
 fn generate_histogram(
     mut q_control: Query<(&mut ImageControl, &Children)>,
-    q_acquisition_images: Query<&AcquisitionChannelImage>,
+    q_acquisition_images: Query<(Entity, &AcquisitionChannelImage)>,
     channel_data: Res<Assets<ChannelImage>>,
 ) {
     for (mut control, children) in q_control.iter_mut() {
@@ -1257,20 +1258,38 @@ fn generate_histogram(
             let num_bins = 100;
             let mut histogram = vec![0; num_bins];
 
-            println!("{:?}", control.intensity_range);
+            // println!("{:?}", control.intensity_range);
 
             let bin_size =
                 (control.intensity_range.1 - control.intensity_range.0) / (num_bins - 1) as f32;
+            // println!("[control] Query: {:?}", children);
+            // println!(
+            //     "Query: {:?}",
+            //     q_acquisition_images
+            //         .iter()
+            //         .map(|(entity, _)| entity)
+            //         .collect::<Vec<_>>()
+            // );
 
             for child in children.iter() {
-                if let Ok(acq_channel_image) = q_acquisition_images.get(*child) {
+                if let Ok((_, acq_channel_image)) = q_acquisition_images.get(*child) {
                     if let Some(data) = &acq_channel_image.data {
                         if let Some(channel_image) = channel_data.get(data) {
-                            for intensity in channel_image.intensities() {
+                            for intensity in channel_image.0.intensities() {
                                 let index = ((intensity - control.intensity_range.0) / bin_size)
                                     .floor() as usize;
 
-                                histogram[index] += 1;
+                                if index >= histogram.len() {
+                                    error!(
+                                        "We have a problem generating histogram ({}): {} | {:?}",
+                                        channel_image.0.name(),
+                                        intensity,
+                                        control.intensity_range
+                                    );
+                                    break;
+                                } else {
+                                    histogram[index] += 1;
+                                }
                             }
                         }
                     }
@@ -1402,9 +1421,6 @@ fn generate_channel_image(
     //mut textures: ResMut<Assets<Image>>,
 ) {
     for (entity, mut image_control, generate, parent) in q_generate.iter_mut() {
-        // We are about to issue the generate ion image command, so we can remove this
-        commands.entity(entity).remove::<GenerateChannelImage>();
-
         // Remove children from the image control (previously loaded data)
         commands.entity(entity).despawn_descendants();
 
@@ -1480,5 +1496,8 @@ fn generate_channel_image(
                 }
             }
         }
+
+        // We are finished with generating the channel image, so we can remove this
+        commands.entity(entity).remove::<GenerateChannelImage>();
     }
 }

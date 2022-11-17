@@ -112,7 +112,7 @@ fn handle_image_events(
 
                 if *allow_dragging {
                     //commands.entity(*entity).insert(Draggable);
-                    println!("Allowing (ImageEvent) dragging: {:?}", entity);
+                    debug!("Allowing (ImageEvent) dragging: {:?}", entity);
                     commands.entity(*entity).insert(Selectable::default());
                 } else {
                     //commands.entity(*entity).remove::<Draggable>();
@@ -536,7 +536,7 @@ fn split_image_into_tiles(
                             }
                         }
 
-                        println!("Took {:?} to generate tiles!", start.elapsed());
+                        info!("Took {:?} to generate tiles!", start.elapsed());
 
                         tiles
                     });
