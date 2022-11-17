@@ -2,13 +2,13 @@ use bevy::{
     prelude::*,
     render::render_resource::{Extent3d, TextureDimension, TextureFormat},
     sprite::Anchor,
-    tasks::Task,
+    tasks::{AsyncComputeTaskPool, Task},
 };
 use futures_lite::future;
 use image::{GenericImageView, RgbaImage};
 use imc_rs::error::MCDError;
 use nalgebra::Vector3;
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Instant};
 
 use crate::{
     camera::{Draggable, DraggedEvent, Selectable, SizedEntity},
@@ -32,7 +32,8 @@ impl Plugin for ImagePlugin {
             .add_system(marker_moved)
             .add_system(enable_registration)
             .add_system(update_loaded_image)
-            .add_system(update_tiled_image)
+            .add_system(split_image_into_tiles)
+            .add_system(spawn_tiles)
             .add_system(
                 handle_image_events
                     .label("image_events")
@@ -385,88 +386,162 @@ pub struct ToTileImage {
     pub image_height: f32,
 }
 
+pub struct Tile {
+    pub image: Image,
+    pub transform: Transform,
+    pub sprite: Sprite,
+}
+
 #[derive(Component)]
 pub struct ComputeTileImage(pub Task<Result<ToTileImage, MCDError>>);
 
-fn update_tiled_image(
+#[derive(Component)]
+pub struct SpawnTiles(pub Task<Vec<Tile>>);
+
+fn spawn_tiles(
     mut commands: Commands,
     mut textures: ResMut<Assets<Image>>,
+    mut q_spawn: Query<(Entity, &mut SpawnTiles)>,
+) {
+    for (entity, mut task) in q_spawn.iter_mut() {
+        if let Some(tiles) = future::block_on(future::poll_once(&mut task.0)) {
+            for tile in tiles {
+                let texture_handle = textures.add(tile.image);
+
+                let tile_entity = commands
+                    .spawn(SpriteBundle {
+                        texture: texture_handle,
+                        transform: tile.transform,
+                        sprite: tile.sprite,
+                        ..Default::default()
+                    })
+                    .id();
+
+                commands.entity(entity).add_child(tile_entity);
+            }
+
+            // Task is complete, so remove task component from entity
+            commands.entity(entity).remove::<SpawnTiles>();
+        }
+    }
+}
+
+/// Split up an image into tiles to ensure that we have small enough textures when displaying.
+/// TODO: This code is relatively slow - taking up to 0.5 s to split up an image - presumably due to the copying of
+/// data. Not sure whether it is possible to avoid so many copies to improve performance here.
+fn split_image_into_tiles(
+    mut commands: Commands,
     mut q_totile: Query<(Entity, &mut ComputeTileImage)>,
 ) {
+    let thread_pool = AsyncComputeTaskPool::get();
+
     for (entity, mut task) in q_totile.iter_mut() {
         if let Some(to_tile) = future::block_on(future::poll_once(&mut task.0)) {
             match to_tile {
                 Ok(to_tile) => {
-                    let tiles_x = div_ceil(to_tile.image.width(), to_tile.tile_width);
-                    let tiles_y = div_ceil(to_tile.image.height(), to_tile.tile_height);
+                    let image_task = thread_pool.spawn(async move {
+                        let mut tiles: Vec<Tile> = Vec::new();
 
-                    for tile_y in 0..tiles_y {
-                        for tile_x in 0..tiles_x {
-                            let start_x = tile_x * to_tile.tile_width;
-                            let start_y = tile_y * to_tile.tile_height;
-                            let tile_width =
-                                to_tile.image.width().min((tile_x + 1) * to_tile.tile_width)
+                        let tiles_x = div_ceil(to_tile.image.width(), to_tile.tile_width);
+                        let tiles_y = div_ceil(to_tile.image.height(), to_tile.tile_height);
+
+                        let start = Instant::now();
+
+                        let image_width_pixels = to_tile.image.width();
+                        let image_height_pixels = to_tile.image.height();
+
+                        for tile_y in 0..tiles_y {
+                            for tile_x in 0..tiles_x {
+                                let start_x = tile_x * to_tile.tile_width;
+                                let start_y = tile_y * to_tile.tile_height;
+                                let tile_width = image_width_pixels
+                                    .min((tile_x + 1) * to_tile.tile_width)
                                     - start_x;
-                            let tile_height = to_tile
-                                .image
-                                .height()
-                                .min((tile_y + 1) * to_tile.tile_height)
-                                - start_y;
+                                let tile_height = image_height_pixels
+                                    .min((tile_y + 1) * to_tile.tile_height)
+                                    - start_y;
 
-                            let tile =
-                                to_tile
+                                let tile = to_tile
                                     .image
-                                    .view(start_x, start_y, tile_width, tile_height);
-                            let data: Vec<u8> = tile.to_image().to_vec();
+                                    .view(start_x, start_y, tile_width, tile_height)
+                                    .to_image();
 
-                            let image_texture = Image::new(
-                                Extent3d {
-                                    width: tile_width,
-                                    height: tile_height,
-                                    depth_or_array_layers: 1,
-                                },
-                                TextureDimension::D2,
-                                data,
-                                TextureFormat::Rgba8Unorm,
-                            );
+                                let image_texture = Image::from_dynamic(tile.into(), false);
 
-                            let texture_handle = textures.add(image_texture);
+                                // let data: Vec<u8> = tile.to_image().into_vec();
 
-                            let tile_width_um = (tile_width as f32 / to_tile.image.width() as f32)
-                                * to_tile.image_width;
+                                // let image_texture = Image::new(
+                                //     Extent3d {
+                                //         width: tile_width,
+                                //         height: tile_height,
+                                //         depth_or_array_layers: 1,
+                                //     },
+                                //     TextureDimension::D2,
+                                //     data,
+                                //     TextureFormat::Rgba8Unorm,
+                                // );
 
-                            let tile_height_um = (tile_height as f32
-                                / to_tile.image.height() as f32)
-                                * to_tile.image_height;
+                                let tile_width_um = (tile_width as f32 / image_width_pixels as f32)
+                                    * to_tile.image_width;
 
-                            // Transformation is defined with respect to slide, so make sure to offset properly
-                            let transform = Transform::from_xyz(
-                                (start_x as f32 / to_tile.image.width() as f32)
-                                    * to_tile.image_width
-                                    - (to_tile.image_width / 2.0),
-                                ((to_tile.image.height() - start_y) as f32
-                                    / to_tile.image.height() as f32)
-                                    * to_tile.image_height
-                                    - (to_tile.image_height / 2.0),
-                                0.0,
-                            );
+                                let tile_height_um = (tile_height as f32
+                                    / image_height_pixels as f32)
+                                    * to_tile.image_height;
 
-                            let tile_entity = commands
-                                .spawn(SpriteBundle {
-                                    texture: texture_handle,
-                                    transform,
-                                    sprite: Sprite {
-                                        custom_size: Some(Vec2::new(tile_width_um, tile_height_um)),
-                                        anchor: Anchor::TopLeft,
-                                        ..Default::default()
-                                    },
+                                // Transformation is defined with respect to slide, so make sure to offset properly
+                                let transform = Transform::from_xyz(
+                                    (start_x as f32 / image_width_pixels as f32)
+                                        * to_tile.image_width
+                                        - (to_tile.image_width / 2.0),
+                                    ((image_height_pixels - start_y) as f32
+                                        / image_height_pixels as f32)
+                                        * to_tile.image_height
+                                        - (to_tile.image_height / 2.0),
+                                    0.0,
+                                );
+
+                                let sprite = Sprite {
+                                    custom_size: Some(Vec2::new(tile_width_um, tile_height_um)),
+                                    anchor: Anchor::TopLeft,
                                     ..Default::default()
-                                })
-                                .id();
+                                };
 
-                            commands.entity(entity).add_child(tile_entity);
+                                // (entity, image_texture, transform, sprite)
+
+                                // let texture_handle = textures.add(image_texture);
+
+                                // let tile_entity = commands
+                                //     .spawn(SpriteBundle {
+                                //         texture: texture_handle,
+                                //         transform,
+                                //         sprite: Sprite {
+                                //             custom_size: Some(Vec2::new(
+                                //                 tile_width_um,
+                                //                 tile_height_um,
+                                //             )),
+                                //             anchor: Anchor::TopLeft,
+                                //             ..Default::default()
+                                //         },
+                                //         ..Default::default()
+                                //     })
+                                //     .id();
+
+                                // commands.entity(entity).add_child(tile_entity);
+
+                                tiles.push(Tile {
+                                    image: image_texture,
+                                    transform,
+                                    sprite,
+                                })
+                            }
                         }
-                    }
+
+                        println!("Took {:?} to generate tiles!", start.elapsed());
+
+                        tiles
+                    });
+
+                    commands.entity(entity).insert(SpawnTiles(image_task));
                 }
                 Err(error) => {
                     commands.spawn(Message {
