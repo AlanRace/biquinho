@@ -576,6 +576,10 @@ fn ui_imc_panel(world: &mut World, ui: &mut Ui) {
                     );
 
                     if min_value_response.changed() || max_value_response.changed() {
+                        if min_value > max_value {
+                            min_value = max_value;
+                        }
+
                         // Avoid double sending the event due to delay in event propagation
                         ui_events.push(UiEvent::Image(ImageEvent::SetColourDomain(
                             control_entity,

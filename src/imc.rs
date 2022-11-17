@@ -1315,8 +1315,10 @@ fn image_control_changed(
                                     for (index, intensity) in
                                         channel_image.intensities().iter().enumerate()
                                     {
-                                        let intensity =
-                                            (intensity / control.colour_domain.1 * 255.0) as u8;
+                                        let intensity = ((intensity - control.colour_domain.0)
+                                            / (control.colour_domain.1 - control.colour_domain.0)
+                                            * 255.0)
+                                            as u8;
 
                                         match control.image_update_type {
                                             ImageUpdateType::Red => {
