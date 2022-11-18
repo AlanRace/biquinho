@@ -585,26 +585,32 @@ fn update_camera(
     info!("Window resized - resizing all textures");
 
     // TODO: Do we really want to resize these images every time?
+    let image_width = physical_view_width as f32;// / window.scale_factor() as f32;
+    let image_height = (window.physical_height() - top_panel_height as u32) as f32;// / window.scale_factor() as f32;
+
     images
         .get_mut(&camera_setup.target.as_ref().unwrap())
         .unwrap()
         .resize(Extent3d {
-            width: physical_view_width,
-            height: window.physical_height() - top_panel_height as u32,
+            width: image_width as u32,
+            height: image_height as u32,
             ..default()
         });
     images
         .get_mut(&camera_setup.cpu_target.as_ref().unwrap())
         .unwrap()
         .resize(Extent3d {
-            width: physical_view_width,
-            height: window.physical_height() - top_panel_height as u32,
+            width: image_width as u32,
+            height: image_height as u32,
             ..default()
         });
 
     if let Ok(mut view_texture_transform) = view_texture.get_single_mut() {
-        view_texture_transform.translation.x = -panel_width / 2.0;
-        view_texture_transform.translation.y = top_panel_height / 2.0;
+        view_texture_transform.translation.x = -panel_width / 2.0 / window.scale_factor() as f32;
+        view_texture_transform.translation.y = top_panel_height / 2.0 / window.scale_factor() as f32;
+
+        view_texture_transform.scale.x =  1.0 / window.scale_factor() as f32;
+        view_texture_transform.scale.y =  1.0 / window.scale_factor() as f32;
     }
 
     // println!("{:?}", window);
