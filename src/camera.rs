@@ -156,7 +156,8 @@ fn handle_camera_event(
                         depth_or_array_layers: 4,
                     };
 
-                    println!("Setting up screenshot: {:?}", size);
+                    println!("Setting up screenshot: {:?} | {:?}", size,  view_texture.size());
+                    println!("Setting up screenshot: {:?} | {:?}", size,  images.get(&camera_setup.target.as_ref().unwrap()).size());
 
                     // TODO: update the size of cpu_target here to re
 
