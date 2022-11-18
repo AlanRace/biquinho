@@ -36,7 +36,9 @@ impl Plugin for UiPlugin {
         app.add_event::<UiEvent>()
         .add_plugin(EguiPlugin)
             .add_plugin(CameraPlugin { camera_setup: CameraSetup {
-                x: 1, y: 1, margin: 10, names: vec![]
+                x: 1, y: 1, margin: 10, names: vec![],
+                target: None,
+                cpu_target: None,
                 // vec!["10^6 WT +50mpk".to_string(),  "10^6 VS".to_string(), "10^6 VS+100mpk".to_string(),
                 // "10^6 WT +20mpk".to_string(),  "10^6 WT".to_string(), "Control".to_string()]
             }})
@@ -840,6 +842,10 @@ fn ui_camera_panel(world: &mut World, ui: &mut Ui) {
                 .auto_shrink([true; 2])
                 .show_viewport(ui, |ui, viewport| {
                     let camera_setup = world.resource::<CameraSetup>();
+
+                    if ui.button("Copy view to clipboard").clicked() {
+                        camera_events.push(CameraEvent::CopyToClipboard);
+                    }
 
                     ui.horizontal(|ui| {
                         ui.label("Grid size");

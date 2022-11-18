@@ -1,14 +1,29 @@
+use arboard::Clipboard;
 use bevy::{
     core_pipeline::clear_color::ClearColorConfig,
     ecs::query::WorldQuery,
     input::mouse::{MouseScrollUnit, MouseWheel},
     prelude::*,
-    render::camera::Viewport,
+    render::{
+        camera::{RenderTarget, Viewport},
+        render_resource::{
+            Extent3d, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages,
+        },
+        renderer::RenderDevice,
+        view::RenderLayers,
+        RenderStage,
+    },
     window::{WindowId, WindowResized},
 };
 use bevy_egui::EguiContext;
+use pollster::FutureExt;
+use wgpu::{BufferDescriptor, BufferUsages};
 
-use crate::ui::{UiLabel, UiSpace};
+use crate::{
+    image_copy::{ImageCopier, ImageCopyPlugin},
+    ui::{UiLabel, UiSpace},
+    Message, Severity,
+};
 
 /// CameraPlugin
 ///
@@ -26,6 +41,7 @@ pub struct CameraPlugin {
 impl Plugin for CameraPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(self.camera_setup.clone())
+            .add_plugin(ImageCopyPlugin)
             .add_startup_system(setup)
             // .add_startup_system(set_camera_viewports.after("initial_setup"))
             .add_event::<CameraEvent>()
@@ -35,6 +51,7 @@ impl Plugin for CameraPlugin {
                                 // .after(UiLabel::Display),
             )
             .add_system(ui_changed)
+            .add_system(copy_to_clipboard.before("handle_camera_event")) // This should be before handling camera events, to force it to be run on the next frame - otherwise the screenshot is empty
             .add_system_to_stage(CoreStage::Update, update_camera)
             .add_system(handle_camera_event.label("handle_camera_event"))
             .add_system(
@@ -68,6 +85,8 @@ pub enum CameraEvent {
     /// Set the scale of all cameras displaying data to the given value. This has the effect of zooming in or out. All cameras are kept
     /// in-sync.
     Zoom(f32),
+
+    CopyToClipboard,
 }
 
 /// Handle all camera events
@@ -78,6 +97,8 @@ fn handle_camera_event(
     mut q_text: Query<&mut Text>,
     mut windows: ResMut<Windows>,
     mut camera_setup: ResMut<CameraSetup>,
+    images: Res<Assets<Image>>,
+    render_device: Res<RenderDevice>,
 ) {
     let window = windows.primary_mut();
 
@@ -126,6 +147,91 @@ fn handle_camera_event(
                     transform.scale.y = *zoom;
                 }
             }
+            CameraEvent::CopyToClipboard => {
+                if let Some(view_texture) = images.get(&camera_setup.cpu_target.as_ref().unwrap()) {
+                    let size = view_texture.size().as_ivec2();
+                    let size = Extent3d {
+                        width: size.x as u32,
+                        height: size.y as u32,
+                        depth_or_array_layers: 4,
+                    };
+
+                    println!("Setting up screenshot: {:?}", size);
+
+                    // TODO: update the size of cpu_target here to re
+
+                    commands.spawn(ImageCopier::new(
+                        camera_setup.target.as_ref().unwrap().clone(),
+                        camera_setup.cpu_target.as_ref().unwrap().clone(),
+                        size,
+                        &render_device,
+                    ));
+                    // image_copier.disable();)
+
+                    // let bytes = [
+                    //     255, 100, 100, 255, 100, 255, 100, 100, 100, 100, 255, 100, 0, 0, 0, 255,
+                    // ];
+                    // let img_data = arboard::ImageData {
+                    //     width: 2,
+                    //     height: 2,
+                    //     bytes: bytes.as_ref().into(),
+                    // };
+                    // ctx.set_image(img_data).unwrap();
+                }
+            }
+        }
+    }
+}
+
+fn copy_to_clipboard(
+    mut commands: Commands,
+    q_copier: Query<(Entity, &ImageCopier)>,
+    camera_setup: Res<CameraSetup>,
+    mut images: ResMut<Assets<Image>>,
+) {
+    for (entity, copier) in q_copier.iter() {
+        let mut ctx = Clipboard::new().unwrap();
+
+        let view_texture = images
+            .get_mut(&camera_setup.cpu_target.as_ref().unwrap())
+            .unwrap();
+
+        let size = view_texture.size();
+
+        let width_in_bytes = size.x as usize * 4;
+
+        let pre_data_length = view_texture.data.len();
+
+        let expected_length = (size.x * size.y) as usize * 4;
+
+        // Due to the padding added (power of 2), we need to filter the data
+        let data = view_texture
+            .data
+            .iter()
+            .enumerate()
+            .filter(|(index, _value)| index % copier.padded_bytes_per_row() < width_in_bytes)
+            .map(|(_, value)| *value)
+            .collect::<Vec<_>>();
+        // let data = &view_texture.data;
+
+        let data_length = data.len();
+
+        if expected_length == data.len() {
+            let img_data = arboard::ImageData {
+                width: size.x as usize,
+                height: size.y as usize,
+                bytes: data.into(),
+            };
+
+            if let Err(error) = ctx.set_image(img_data) {
+                commands.spawn(Message {
+                severity: Severity::Error,
+                message: format!("Error occured when trying to copy image to clipboard. This can happen if data is still loading in the background. Please try again.\n\nExpected size: {} x {}\nData size: {}\nData size(pre-filter): {}\n\nDescription: {:?}", 
+                size.x, size.y, data_length, pre_data_length, error),
+            });
+            }
+
+            commands.entity(entity).despawn_recursive();
         }
     }
 }
@@ -172,6 +278,9 @@ pub struct CameraSetup {
 
     pub margin: u32,
 
+    pub target: Option<Handle<Image>>,
+    pub cpu_target: Option<Handle<Image>>,
+
     pub names: Vec<String>,
 }
 
@@ -182,6 +291,8 @@ impl Default for CameraSetup {
             y: 1,
             margin: 10,
             names: Vec::new(),
+            target: None,
+            cpu_target: None,
         }
     }
 }
@@ -194,7 +305,64 @@ impl Default for CameraSetup {
 //     camera_text: Entity,
 // }
 
-fn setup(mut commands: Commands, camera_setup: Res<CameraSetup>, asset_server: Res<AssetServer>) {
+#[derive(Component)]
+struct ViewTexture;
+
+fn setup(
+    mut commands: Commands,
+    mut camera_setup: ResMut<CameraSetup>,
+    asset_server: Res<AssetServer>,
+    mut images: ResMut<Assets<Image>>,
+    render_device: Res<RenderDevice>,
+) {
+    let size = Extent3d {
+        width: 512,
+        height: 512,
+        ..default()
+    };
+
+    // This is the texture that will be rendered to.
+    let mut image = Image {
+        texture_descriptor: TextureDescriptor {
+            label: None,
+            size,
+            dimension: TextureDimension::D2,
+            format: TextureFormat::Rgba8UnormSrgb, //Rgba8Unorm, //
+            mip_level_count: 1,
+            sample_count: 1,
+            usage: TextureUsages::TEXTURE_BINDING
+                | TextureUsages::COPY_SRC
+                | TextureUsages::COPY_DST
+                | TextureUsages::RENDER_ATTACHMENT,
+        },
+        ..default()
+    };
+
+    // fill image.data with zeroes
+    image.resize(size);
+
+    // This is the texture that will be rendered to.
+    let mut cpu_image = Image {
+        texture_descriptor: TextureDescriptor {
+            label: None,
+            size,
+            dimension: TextureDimension::D2,
+            format: TextureFormat::Rgba8UnormSrgb, //Rgba8Unorm, //
+            mip_level_count: 1,
+            sample_count: 1,
+            usage: TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_DST,
+        },
+        ..default()
+    };
+
+    // fill image.data with zeroes
+    cpu_image.resize(size);
+
+    let image_handle = images.add(image);
+    camera_setup.target = Some(image_handle.clone());
+    let cpu_image_handle = images.add(cpu_image);
+    camera_setup.cpu_target = Some(cpu_image_handle.clone());
+
     let far = 1000.0;
 
     let mut camera_transform = Transform::from_xyz(0.0, 0.0, far - 0.1);
@@ -212,6 +380,17 @@ fn setup(mut commands: Commands, camera_setup: Res<CameraSetup>, asset_server: R
     //     margin: 10,
     // });
 
+    // This specifies the layer used for the ui and showing the texture
+    let ui_layer = RenderLayers::layer(1);
+    commands.spawn((
+        SpriteBundle {
+            texture: image_handle,
+            ..default()
+        },
+        ui_layer,
+        ViewTexture,
+    ));
+
     // Spawn the UI camera
     // Transform the camera well away from the view - there should be a nicer way to do this, but otherwise
     // this camera displays the scene as well as the UI, causing issues for the multiview cameras
@@ -225,10 +404,11 @@ fn setup(mut commands: Commands, camera_setup: Res<CameraSetup>, asset_server: R
                 // don't clear the color while rendering this camera
                 clear_color: ClearColorConfig::None,
             },
-            transform: Transform::from_xyz(-1000000.0, 1000000.0, 0.0),
+            // transform: Transform::from_xyz(-1000000.0, 1000000.0, 0.0),
             ..default()
         },
         UiCameraConfig::default(),
+        ui_layer,
     ));
 
     commands.spawn(MousePosition::default());
@@ -267,6 +447,11 @@ fn create_cameras(mut commands: Commands, camera_setup: &CameraSetup, asset_serv
             let camera_bundle = if x == 0 && y == 0 {
                 Camera2dBundle {
                     transform,
+                    camera: Camera {
+                        target: RenderTarget::Image(camera_setup.target.as_ref().unwrap().clone()),
+                        ..default()
+                    },
+
                     ..default()
                 }
             } else {
@@ -274,6 +459,8 @@ fn create_cameras(mut commands: Commands, camera_setup: &CameraSetup, asset_serv
                     transform,
                     camera: Camera {
                         priority: ((y * camera_setup.x) + x) as isize,
+
+                        target: RenderTarget::Image(camera_setup.target.as_ref().unwrap().clone()),
                         ..default()
                     },
                     camera_2d: Camera2d {
@@ -367,6 +554,8 @@ fn update_camera(
     windows: Res<Windows>,
     ui_space: Res<UiSpace>,
     camera_setup: Res<CameraSetup>,
+    mut view_texture: Query<&mut Transform, With<ViewTexture>>,
+    mut images: ResMut<Assets<Image>>,
     mut cameras: Query<(&mut Camera, &PanCamera), Changed<PanCamera>>,
     mut camera_text: Query<(&mut Text, &mut Style), With<CameraText>>,
 ) {
@@ -378,19 +567,45 @@ fn update_camera(
     let window = windows.primary();
 
     let panel_width = ui_space.right() * window.scale_factor() as f32;
-    let top_panel_width = ui_space.top() * window.scale_factor() as f32;
-    let bottom_panel_width = ui_space.bottom() * window.scale_factor() as f32;
+    let top_panel_height = ui_space.top() * window.scale_factor() as f32;
+    let bottom_panel_height = ui_space.bottom() * window.scale_factor() as f32;
 
-    let physical_width = ((window.physical_width() - panel_width as u32)
-        - (camera_setup.margin * (camera_setup.x - 1)))
-        / camera_setup.x;
-    let physical_height =
-        ((window.physical_height() - top_panel_width as u32 - bottom_panel_width as u32)
-            - (camera_setup.margin * (camera_setup.y - 1)))
-            / camera_setup.y;
+    let physical_view_width = window.physical_width() - panel_width as u32;
+    let physical_view_height =
+        window.physical_height() - top_panel_height as u32 - bottom_panel_height as u32;
 
-    let width = physical_width as f32 / window.scale_factor() as f32;
-    let height = physical_height as f32 / window.scale_factor() as f32;
+    let physical_camera_width =
+        (physical_view_width - (camera_setup.margin * (camera_setup.x - 1))) / camera_setup.x;
+    let physical_camera_height =
+        (physical_view_height - (camera_setup.margin * (camera_setup.y - 1))) / camera_setup.y;
+
+    let width = physical_camera_width as f32 / window.scale_factor() as f32;
+    let height = physical_camera_height as f32 / window.scale_factor() as f32;
+
+    info!("Window resized - resizing all textures");
+
+    // TODO: Do we really want to resize these images every time?
+    images
+        .get_mut(&camera_setup.target.as_ref().unwrap())
+        .unwrap()
+        .resize(Extent3d {
+            width: physical_view_width,
+            height: window.physical_height() - top_panel_height as u32,
+            ..default()
+        });
+    images
+        .get_mut(&camera_setup.cpu_target.as_ref().unwrap())
+        .unwrap()
+        .resize(Extent3d {
+            width: physical_view_width,
+            height: window.physical_height() - top_panel_height as u32,
+            ..default()
+        });
+
+    if let Ok(mut view_texture_transform) = view_texture.get_single_mut() {
+        view_texture_transform.translation.x = -panel_width / 2.0;
+        view_texture_transform.translation.y = top_panel_height / 2.0;
+    }
 
     // println!("{:?}", window);
     // println!("{:?}", ui_space);
@@ -400,12 +615,15 @@ fn update_camera(
     for (mut camera, position) in cameras.iter_mut() {
         camera.viewport = Some(Viewport {
             physical_position: UVec2::new(
-                (physical_width + camera_setup.margin) * position.x,
-                (physical_height + camera_setup.margin) * (position.y) + top_panel_width as u32,
+                (physical_camera_width + camera_setup.margin) * position.x,
+                (physical_camera_height + camera_setup.margin) * (position.y)
+                    + top_panel_height as u32,
             ),
-            physical_size: UVec2::new(physical_width, physical_height),
+            physical_size: UVec2::new(physical_camera_width, physical_camera_height),
             ..default()
         });
+
+        // println!("{:?}", camera.viewport);
 
         if let Ok((mut text, mut style)) = camera_text.get_mut(position.camera_text) {
             let index = (position.y * camera_setup.x) + position.x;

@@ -32,6 +32,7 @@ mod camera;
 mod colour;
 mod data;
 // mod geometry;
+mod image_copy;
 /// ImagePlugin - handles loading and viewing image data (including channel images).
 mod image_plugin;
 /// IMCPlugin - handles specific loading and visualisation of imaging mass cytometry data.
