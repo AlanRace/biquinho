@@ -14,39 +14,40 @@ pub struct DataPlugin;
 
 impl Plugin for DataPlugin {
     fn build(&self, app: &mut App) {
-        app.add_event::<DataEvent>().add_system(handle_data_events);
+        app.add_event::<DataCommand>()
+            .add_system(issue_data_commands);
     }
 }
 
 #[derive(Clone)]
-pub enum DataEvent {
+pub enum DataCommand {
     OpenData(PathBuf),
     CloseData(Entity),
     IMCEvent(IMCEvent),
     LoadCellData(Entity, PathBuf),
 }
 
-fn handle_data_events(
+fn issue_data_commands(
     mut commands: Commands,
 
-    mut data_events: EventReader<DataEvent>,
+    mut data_events: EventReader<DataCommand>,
     mut imc_events: EventWriter<IMCEvent>,
     mut textures: ResMut<Assets<Image>>,
 ) {
     for event in data_events.iter() {
         match event {
-            DataEvent::OpenData(filename) => {
+            DataCommand::OpenData(filename) => {
                 // TODO: Detect file type and initiate the correct event
 
                 imc_events.send(IMCEvent::Load(filename.clone()));
             }
-            DataEvent::CloseData(entity) => {
+            DataCommand::CloseData(entity) => {
                 commands.entity(*entity).despawn_recursive();
             }
-            DataEvent::IMCEvent(event) => {
+            DataCommand::IMCEvent(event) => {
                 imc_events.send(event.clone());
             }
-            DataEvent::LoadCellData(entity, cell_data) => {
+            DataCommand::LoadCellData(entity, cell_data) => {
                 // let thread_pool = AsyncComputeTaskPool::get();
 
                 // let load_task = thread_pool.spawn(async move {

@@ -10,7 +10,7 @@ use crate::{
     imc::{self, Acquisition, ClassifierOutput, IMCDataset, IMCEvent},
 };
 
-use super::{DataEvent, UiEvent};
+use super::{DataCommand, UiEvent};
 
 pub struct ClassificationUiPlugin;
 
@@ -243,7 +243,7 @@ fn ui_classification_window(
 
                 ui.horizontal(|ui| {
                     if ui.button("Classify").clicked() {
-                        ui_events.send(UiEvent::Data(DataEvent::IMCEvent(
+                        ui_events.send(UiEvent::Data(DataCommand::IMCEvent(
                             IMCEvent::GeneratePixelAnnotation {
                                 labels: window
                                     .annotations

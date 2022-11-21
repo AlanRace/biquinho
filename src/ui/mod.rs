@@ -18,7 +18,7 @@ use crate::{
         CameraCommand, CameraPlugin, CameraSetup, Draggable, FieldOfView, MousePosition, PanCamera,
         Selectable,
     },
-    data::{CellSegmentation, DataEvent},
+    data::{CellSegmentation, DataCommand},
     image_plugin::{ImageControl, ImageEvent, Opacity},
     imc::{Acquisition, GenerateChannelImage, HistogramScale, IMCDataset, IMCEvent, LoadIMC},
     Message,
@@ -110,7 +110,7 @@ pub enum UiEvent {
     Camera(CameraCommand),
     Annotation(AnnotationEvent),
     Image(ImageEvent),
-    Data(DataEvent),
+    Data(DataCommand),
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
@@ -321,7 +321,7 @@ fn handle_ui_events(
     mut camera_events: EventWriter<CameraCommand>,
     mut annotation_events: EventWriter<AnnotationEvent>,
     mut image_events: EventWriter<ImageEvent>,
-    mut data_events: EventWriter<DataEvent>,
+    mut data_events: EventWriter<DataCommand>,
 ) {
     for event in ui_events.iter() {
         match event {
@@ -536,7 +536,7 @@ fn ui_imc_panel(world: &mut World, ui: &mut Ui) {
                                     .orientation(egui::SliderOrientation::Horizontal),
                             );
                             if opacity.changed() {
-                                ui_events.push(UiEvent::Data(DataEvent::IMCEvent(
+                                ui_events.push(UiEvent::Data(DataCommand::IMCEvent(
                                     IMCEvent::SetBackgroundOpacity {
                                         entity,
                                         opacity: alpha,
@@ -569,7 +569,7 @@ fn ui_imc_panel(world: &mut World, ui: &mut Ui) {
                             });
 
                             if histogram_scale != *imc.histogram_scale() {
-                                ui_events.push(UiEvent::Data(DataEvent::IMCEvent(
+                                ui_events.push(UiEvent::Data(DataCommand::IMCEvent(
                                     IMCEvent::SetHistogramScale {
                                         entity,
                                         scale: histogram_scale,
@@ -1036,7 +1036,7 @@ fn ui_data_panel(world: &mut World, ui: &mut Ui, max_height: f32) {
 
                             if close_response.clicked() {
                                 // world.send_event(UiEvent::Data(DataEvent::CloseData(entity)));
-                                events.push(UiEvent::Data(DataEvent::CloseData(entity)));
+                                events.push(UiEvent::Data(DataCommand::CloseData(entity)));
                             }
                         });
                     })
@@ -1609,7 +1609,8 @@ fn add_children_to_ui_world(
                                 .pick_file()
                             {
                                 // self.picked_path = Some(path.display().to_string());
-                                ui_events.push(UiEvent::Data(DataEvent::LoadCellData(*child, path)))
+                                ui_events
+                                    .push(UiEvent::Data(DataCommand::LoadCellData(*child, path)))
                             }
                         }
                     });
@@ -1775,7 +1776,7 @@ fn ui_top_panel(
                 if ui.button("Open").clicked() {
                     if let Some(path) = rfd::FileDialog::new().pick_file() {
                         //self.picked_path = Some(path.display().to_string());
-                        ui_events.send(UiEvent::Data(DataEvent::OpenData(path)))
+                        ui_events.send(UiEvent::Data(DataCommand::OpenData(path)))
                     }
                 }
                 if ui.button("Quit").clicked() {

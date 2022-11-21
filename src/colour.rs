@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use egui::Color32;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum Colour {
     Bevy(Color),
     Egui(Color32),
@@ -11,7 +11,7 @@ pub enum Colour {
 impl Colour {
     pub fn bevy(&self) -> Color {
         match self {
-            Colour::Bevy(colour) => colour.clone(),
+            Colour::Bevy(colour) => *colour,
             Colour::Egui(colour) => Color::rgba_u8(colour.r(), colour.g(), colour.b(), colour.a()),
         }
     }
@@ -24,7 +24,7 @@ impl Colour {
                 (colour.b() * 255.0) as u8,
                 (colour.a() * 255.0) as u8,
             ),
-            Colour::Egui(colour) => colour.clone(),
+            Colour::Egui(colour) => *colour,
         }
     }
 }

@@ -49,9 +49,9 @@ impl Plugin for CameraPlugin {
                                 // .after(UiLabel::Display),
             )
             .add_system(ui_changed)
-            .add_system(copy_to_clipboard.before("handle_camera_event")) // This should be before handling camera events, to force it to be run on the next frame - otherwise the screenshot is empty
+            .add_system(copy_to_clipboard.before("issue_camera_commands")) // This should be before handling camera events, to force it to be run on the next frame - otherwise the screenshot is empty
             .add_system_to_stage(CoreStage::Update, update_camera)
-            .add_system(handle_camera_event.label("handle_camera_event"))
+            .add_system(issue_camera_commands.label("issue_camera_commands"))
             .add_system(
                 update_mouse_position
                     .label("mouse_update")
@@ -88,7 +88,7 @@ pub enum CameraCommand {
 }
 
 /// Handle all camera events
-fn handle_camera_event(
+fn issue_camera_commands(
     mut commands: Commands,
     mut ev_camera: EventReader<CameraCommand>,
     mut q_camera: Query<(Entity, &PanCamera, &mut Transform)>,
@@ -389,7 +389,7 @@ fn setup(
     let image_handle = images.add(image);
     camera_setup.target = Some(image_handle.clone());
     let cpu_image_handle = images.add(cpu_image);
-    camera_setup.cpu_target = Some(cpu_image_handle.clone());
+    camera_setup.cpu_target = Some(cpu_image_handle);
 
     let far = 1000.0;
 
@@ -732,7 +732,7 @@ impl Selectable {
 // }
 
 pub fn get_primary_window_size(windows: &Res<Windows>) -> Vec2 {
-    let window = windows.get_primary().unwrap();
+    let window = windows.primary();
 
     Vec2::new(window.width() as f32, window.height() as f32)
 }
