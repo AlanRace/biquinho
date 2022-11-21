@@ -14,7 +14,7 @@ use bevy::render::render_resource::{
 };
 use pollster::FutureExt;
 
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 
 pub fn receive_images(
     image_copiers: Query<&ImageCopier>,
@@ -46,6 +46,8 @@ pub fn receive_images(
             image_copier.buffer.unmap();
         }
         .block_on();
+
+        image_copier.copied();
     }
 }
 
@@ -79,6 +81,9 @@ pub struct ImageCopier {
     dst_image: Handle<Image>,
 
     padded_bytes_per_row: usize,
+
+    copied: Arc<AtomicI32>,
+    rendered: Arc<AtomicI32>,
 }
 
 impl ImageCopier {
@@ -89,7 +94,7 @@ impl ImageCopier {
         render_device: &RenderDevice,
     ) -> ImageCopier {
         let padded_bytes_per_row =
-            RenderDevice::align_copy_bytes_per_row((size.width) as usize) * 4;
+            RenderDevice::align_copy_bytes_per_row((size.width) as usize * 4);
 
         let cpu_buffer = render_device.create_buffer(&BufferDescriptor {
             label: None,
@@ -104,6 +109,9 @@ impl ImageCopier {
             dst_image,
             enabled: Arc::new(AtomicBool::new(true)),
             padded_bytes_per_row,
+
+            copied: Arc::new(AtomicI32::new(0)),
+            rendered: Arc::new(AtomicI32::new(0)),
         }
     }
 
@@ -121,6 +129,21 @@ impl ImageCopier {
 
     pub fn padded_bytes_per_row(&self) -> usize {
         self.padded_bytes_per_row
+    }
+
+    pub fn copy_count(&self) -> i32 {
+        self.copied.load(Ordering::Relaxed)
+    }
+    pub fn render_count(&self) -> i32 {
+        self.rendered.load(Ordering::Relaxed)
+    }
+
+    pub fn copied(&self) {
+        self.copied.fetch_add(1, Ordering::Relaxed);
+    }
+
+    pub fn rendered(&self) {
+        self.rendered.fetch_add(1, Ordering::Relaxed);
     }
 }
 
@@ -184,6 +207,8 @@ impl render_graph::Node for ImageCopyDriver {
 
             let render_queue = world.get_resource::<RenderQueue>().unwrap();
             render_queue.submit(std::iter::once(encoder.finish()));
+
+            image_copier.rendered();
         }
 
         Ok(())

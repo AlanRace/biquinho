@@ -97,7 +97,7 @@ fn handle_camera_event(
     mut q_text: Query<&mut Text>,
     mut windows: ResMut<Windows>,
     mut camera_setup: ResMut<CameraSetup>,
-    images: Res<Assets<Image>>,
+    mut images: ResMut<Assets<Image>>,
     render_device: Res<RenderDevice>,
 ) {
     let window = windows.primary_mut();
@@ -148,37 +148,57 @@ fn handle_camera_event(
                 }
             }
             CameraEvent::CopyToClipboard => {
-                if let Some(view_texture) = images.get(&camera_setup.cpu_target.as_ref().unwrap()) {
-                    let size = view_texture.size().as_ivec2();
-                    let size = Extent3d {
-                        width: size.x as u32,
-                        height: size.y as u32,
-                        depth_or_array_layers: 4,
-                    };
+                let size = images
+                    .get(&camera_setup.target.as_ref().unwrap())
+                    .unwrap()
+                    .size()
+                    .as_ivec2();
 
-                    println!("Setting up screenshot: {:?} | {:?}", size,  view_texture.size());
-                    println!("Setting up screenshot: {:?} | {:?}", size,  images.get(&camera_setup.target.as_ref().unwrap()).size());
+                let size = Extent3d {
+                    width: size.x as u32,
+                    height: size.y as u32,
+                    ..default()
+                };
 
-                    // TODO: update the size of cpu_target here to re
+                let view_texture = images
+                    .get_mut(&camera_setup.cpu_target.as_ref().unwrap())
+                    .unwrap();
 
-                    commands.spawn(ImageCopier::new(
-                        camera_setup.target.as_ref().unwrap().clone(),
-                        camera_setup.cpu_target.as_ref().unwrap().clone(),
-                        size,
-                        &render_device,
-                    ));
-                    // image_copier.disable();)
+                view_texture.resize(size);
 
-                    // let bytes = [
-                    //     255, 100, 100, 255, 100, 255, 100, 100, 100, 100, 255, 100, 0, 0, 0, 255,
-                    // ];
-                    // let img_data = arboard::ImageData {
-                    //     width: 2,
-                    //     height: 2,
-                    //     bytes: bytes.as_ref().into(),
-                    // };
-                    // ctx.set_image(img_data).unwrap();
-                }
+                println!(
+                    "Setting up screenshot: {:?} | {:?}",
+                    size,
+                    view_texture.size()
+                );
+                println!(
+                    "Setting up screenshot: {:?} | {:?}",
+                    size,
+                    images
+                        .get(&camera_setup.target.as_ref().unwrap())
+                        .unwrap()
+                        .size()
+                );
+
+                // TODO: update the size of cpu_target here to re
+
+                commands.spawn(ImageCopier::new(
+                    camera_setup.target.as_ref().unwrap().clone(),
+                    camera_setup.cpu_target.as_ref().unwrap().clone(),
+                    size,
+                    &render_device,
+                ));
+                // image_copier.disable();)
+
+                // let bytes = [
+                //     255, 100, 100, 255, 100, 255, 100, 100, 100, 100, 255, 100, 0, 0, 0, 255,
+                // ];
+                // let img_data = arboard::ImageData {
+                //     width: 2,
+                //     height: 2,
+                //     bytes: bytes.as_ref().into(),
+                // };
+                // ctx.set_image(img_data).unwrap();
             }
         }
     }
@@ -191,6 +211,15 @@ fn copy_to_clipboard(
     mut images: ResMut<Assets<Image>>,
 ) {
     for (entity, copier) in q_copier.iter() {
+        if copier.copy_count() == 0 && copier.render_count() == 0 {
+            continue;
+        }
+        info!(
+            "Copier: copied: {} rendered: {}",
+            copier.copy_count(),
+            copier.render_count()
+        );
+
         let mut ctx = Clipboard::new().unwrap();
 
         let view_texture = images
@@ -586,8 +615,8 @@ fn update_camera(
     info!("Window resized - resizing all textures");
 
     // TODO: Do we really want to resize these images every time?
-    let image_width = physical_view_width as f32;// / window.scale_factor() as f32;
-    let image_height = (window.physical_height() - top_panel_height as u32) as f32;// / window.scale_factor() as f32;
+    let image_width = physical_view_width as f32; // / window.scale_factor() as f32;
+    let image_height = (window.physical_height() - top_panel_height as u32) as f32; // / window.scale_factor() as f32;
 
     images
         .get_mut(&camera_setup.target.as_ref().unwrap())
@@ -597,21 +626,14 @@ fn update_camera(
             height: image_height as u32,
             ..default()
         });
-    images
-        .get_mut(&camera_setup.cpu_target.as_ref().unwrap())
-        .unwrap()
-        .resize(Extent3d {
-            width: image_width as u32,
-            height: image_height as u32,
-            ..default()
-        });
 
     if let Ok(mut view_texture_transform) = view_texture.get_single_mut() {
         view_texture_transform.translation.x = -panel_width / 2.0 / window.scale_factor() as f32;
-        view_texture_transform.translation.y = top_panel_height / 2.0 / window.scale_factor() as f32;
+        view_texture_transform.translation.y =
+            top_panel_height / 2.0 / window.scale_factor() as f32;
 
-        view_texture_transform.scale.x =  1.0 / window.scale_factor() as f32;
-        view_texture_transform.scale.y =  1.0 / window.scale_factor() as f32;
+        view_texture_transform.scale.x = 1.0 / window.scale_factor() as f32;
+        view_texture_transform.scale.y = 1.0 / window.scale_factor() as f32;
     }
 
     // println!("{:?}", window);
