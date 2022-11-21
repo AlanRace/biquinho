@@ -410,16 +410,8 @@ fn setup(
     //     margin: 10,
     // });
 
-    // This specifies the layer used for the ui and showing the texture
+    // This specifies the layer used for the ui
     let ui_layer = RenderLayers::layer(1);
-    commands.spawn((
-        SpriteBundle {
-            texture: image_handle,
-            ..default()
-        },
-        ui_layer,
-        ViewTexture,
-    ));
 
     // Spawn the UI camera
     // Transform the camera well away from the view - there should be a nicer way to do this, but otherwise
@@ -428,6 +420,8 @@ fn setup(
         Camera2dBundle {
             camera: Camera {
                 priority: 100,
+
+                target: RenderTarget::Image(camera_setup.target.as_ref().unwrap().clone()),
                 ..default()
             },
             camera_2d: Camera2d {
@@ -439,6 +433,34 @@ fn setup(
         },
         UiCameraConfig::default(),
         ui_layer,
+    ));
+
+    // This specifies the layer used for the showing the texture
+    let texture_layer = RenderLayers::layer(2);
+
+    commands.spawn((
+        SpriteBundle {
+            texture: image_handle,
+            ..default()
+        },
+        texture_layer,
+        ViewTexture,
+    ));
+
+    // Spawn the
+    commands.spawn((
+        Camera2dBundle {
+            camera: Camera {
+                priority: 101,
+                ..default()
+            },
+            camera_2d: Camera2d {
+                // don't clear the color while rendering this camera
+                clear_color: ClearColorConfig::None,
+            },
+            ..default()
+        },
+        texture_layer,
     ));
 
     commands.spawn(MousePosition::default());
@@ -467,6 +489,9 @@ fn changed_camera_setup(
 struct CameraText;
 
 fn create_cameras(mut commands: Commands, camera_setup: &CameraSetup, asset_server: &AssetServer) {
+    // This specifies the layer used for the ui and showing the texture
+    let ui_layer = RenderLayers::layer(1);
+
     for y in 0..camera_setup.y {
         for x in 0..camera_setup.x {
             let mut transform = Transform::from_scale(Vec3::new(40.0, 40.0, 1.0));
@@ -526,6 +551,7 @@ fn create_cameras(mut commands: Commands, camera_setup: &CameraSetup, asset_serv
                     }),
                 )
                 .insert(CameraText)
+                .insert(ui_layer)
                 .id();
 
             commands
