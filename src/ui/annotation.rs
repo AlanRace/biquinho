@@ -4,7 +4,7 @@ use rand::Rng;
 
 use crate::{
     annotation::{Annotation, AnnotationEvent, Tool},
-    camera::CameraEvent,
+    camera::CameraCommand,
 };
 
 use super::{Editing, UiEvent, UiIcon, UiState};
@@ -64,7 +64,7 @@ pub(super) fn create_annotation_ui(world: &mut World, ui: &mut Ui) {
                                 .clicked()
                             {
                                 ui_events.push(UiEvent::Annotation(AnnotationEvent::StopEdit));
-                                ui_events.push(UiEvent::Camera(CameraEvent::EnableDragging));
+                                ui_events.push(UiEvent::Camera(CameraCommand::EnableDragging));
                             }
 
                             if let Some(active_tool) = annotation.active_tool() {
@@ -111,7 +111,7 @@ pub(super) fn create_annotation_ui(world: &mut World, ui: &mut Ui) {
                                 ui_events.push(UiEvent::Annotation(AnnotationEvent::Edit(
                                     pencil_entity,
                                 )));
-                                ui_events.push(UiEvent::Camera(CameraEvent::DisableDragging));
+                                ui_events.push(UiEvent::Camera(CameraCommand::DisableDragging));
                             }
 
                             match visibility.is_visible {

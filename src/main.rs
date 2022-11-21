@@ -50,7 +50,7 @@ use bevy::{
     winit::{WinitSettings, WinitWindows},
 };
 use bevy_prototype_lyon::plugin::ShapePlugin;
-use camera::CameraEvent;
+use camera::CameraCommand;
 use data::DataPlugin;
 use imc::LoadIMC;
 use imc_rs::MCD;
@@ -211,10 +211,10 @@ fn create_transform(
 fn setup(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
-    mut camera_events: EventWriter<CameraEvent>,
+    mut camera_events: EventWriter<CameraCommand>,
 ) {
     // Send an event to enable dragging of camera
-    camera_events.send(CameraEvent::EnableDragging);
+    camera_events.send(CameraCommand::EnableDragging);
 
     // Draw grid lines
     // TODO: Move the grid generation to its own plugin?

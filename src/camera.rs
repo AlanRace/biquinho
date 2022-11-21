@@ -16,8 +16,6 @@ use bevy::{
     window::{WindowId, WindowResized},
 };
 use bevy_egui::EguiContext;
-use pollster::FutureExt;
-use wgpu::{BufferDescriptor, BufferUsages};
 
 use crate::{
     image_copy::{ImageCopier, ImageCopyPlugin},
@@ -44,7 +42,7 @@ impl Plugin for CameraPlugin {
             .add_plugin(ImageCopyPlugin)
             .add_startup_system(setup)
             // .add_startup_system(set_camera_viewports.after("initial_setup"))
-            .add_event::<CameraEvent>()
+            .add_event::<CameraCommand>()
             .add_event::<DraggedEvent>()
             .add_system(
                 window_resized, // .after("handle_camera_event")
@@ -70,7 +68,7 @@ impl Plugin for CameraPlugin {
 
 /// Camera events define ways to interact with this plugin.
 #[derive(Clone)]
-pub enum CameraEvent {
+pub enum CameraCommand {
     /// Enables dragging on all cameras displaying data. This allows the user to drag the view by clicking and dragging.
     EnableDragging,
     /// Disables dragging on all cameras displaying data.
@@ -92,7 +90,7 @@ pub enum CameraEvent {
 /// Handle all camera events
 fn handle_camera_event(
     mut commands: Commands,
-    mut ev_camera: EventReader<CameraEvent>,
+    mut ev_camera: EventReader<CameraCommand>,
     mut q_camera: Query<(Entity, &PanCamera, &mut Transform)>,
     mut q_text: Query<&mut Text>,
     mut windows: ResMut<Windows>,
@@ -104,7 +102,7 @@ fn handle_camera_event(
 
     for event in ev_camera.iter() {
         match event {
-            CameraEvent::EnableDragging => {
+            CameraCommand::EnableDragging => {
                 // Re-enable the camera
                 for (camera, _, _) in q_camera.iter() {
                     println!("Enabling dragging {:?}", camera);
@@ -114,7 +112,7 @@ fn handle_camera_event(
 
                 window.set_cursor_icon(CursorIcon::Hand);
             }
-            CameraEvent::DisableDragging => {
+            CameraCommand::DisableDragging => {
                 // Disable the camera
                 for (camera, _, _) in q_camera.iter() {
                     commands.entity(camera).remove::<Selectable>();
@@ -122,32 +120,32 @@ fn handle_camera_event(
 
                 window.set_cursor_icon(CursorIcon::Default);
             }
-            CameraEvent::SetGrid((x, y)) => {
+            CameraCommand::SetGrid((x, y)) => {
                 if *x != camera_setup.x || *y != camera_setup.y {
                     camera_setup.x = *x;
                     camera_setup.y = *y;
                 }
             }
-            CameraEvent::SetName((entity, name)) => {
+            CameraCommand::SetName((entity, name)) => {
                 if let Ok((_, camera, _)) = q_camera.get(*entity) {
                     if let Ok(mut text) = q_text.get_mut(camera.camera_text) {
                         text.sections[0].value = name.clone();
                     }
                 }
             }
-            CameraEvent::LookAt((entity, position)) => {
+            CameraCommand::LookAt((entity, position)) => {
                 if let Ok((_, _, mut transform)) = q_camera.get_mut(*entity) {
                     transform.translation.x = position.x;
                     transform.translation.y = position.y;
                 }
             }
-            CameraEvent::Zoom(zoom) => {
+            CameraCommand::Zoom(zoom) => {
                 for (_camera, _, mut transform) in q_camera.iter_mut() {
                     transform.scale.x = *zoom;
                     transform.scale.y = *zoom;
                 }
             }
-            CameraEvent::CopyToClipboard => {
+            CameraCommand::CopyToClipboard => {
                 let size = images
                     .get(&camera_setup.target.as_ref().unwrap())
                     .unwrap()

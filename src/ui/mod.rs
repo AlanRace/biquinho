@@ -15,7 +15,7 @@ use imc_rs::ChannelIdentifier;
 use crate::{
     annotation::{AnnotationEvent, AnnotationPlugin},
     camera::{
-        CameraEvent, CameraPlugin, CameraSetup, Draggable, FieldOfView, MousePosition, PanCamera,
+        CameraCommand, CameraPlugin, CameraSetup, Draggable, FieldOfView, MousePosition, PanCamera,
         Selectable,
     },
     data::{CellSegmentation, DataEvent},
@@ -107,7 +107,7 @@ pub enum UiLabel {
 }
 
 pub enum UiEvent {
-    Camera(CameraEvent),
+    Camera(CameraCommand),
     Annotation(AnnotationEvent),
     Image(ImageEvent),
     Data(DataEvent),
@@ -318,7 +318,7 @@ impl FromWorld for UiState {
 fn handle_ui_events(
     mut ui_events: EventReader<UiEvent>,
     mut ui_state: ResMut<UiState>,
-    mut camera_events: EventWriter<CameraEvent>,
+    mut camera_events: EventWriter<CameraCommand>,
     mut annotation_events: EventWriter<AnnotationEvent>,
     mut image_events: EventWriter<ImageEvent>,
     mut data_events: EventWriter<DataEvent>,
@@ -844,7 +844,7 @@ fn ui_camera_panel(world: &mut World, ui: &mut Ui) {
                     let camera_setup = world.resource::<CameraSetup>();
 
                     if ui.button("Copy view to clipboard").clicked() {
-                        camera_events.push(CameraEvent::CopyToClipboard);
+                        camera_events.push(CameraCommand::CopyToClipboard);
                     }
 
                     ui.horizontal(|ui| {
@@ -857,7 +857,7 @@ fn ui_camera_panel(world: &mut World, ui: &mut Ui) {
 
                         if x_edit.show(ui).response.changed() {
                             if let Ok(x) = x.parse::<u32>() {
-                                camera_events.push(CameraEvent::SetGrid((x, camera_setup.y)));
+                                camera_events.push(CameraCommand::SetGrid((x, camera_setup.y)));
                             }
                         }
                         ui.label(" x ");
@@ -869,7 +869,7 @@ fn ui_camera_panel(world: &mut World, ui: &mut Ui) {
                         let y_edit = egui::TextEdit::singleline(y).desired_width(20.0);
                         if y_edit.show(ui).response.changed() {
                             if let Ok(y) = y.parse::<u32>() {
-                                camera_events.push(CameraEvent::SetGrid((camera_setup.x, y)));
+                                camera_events.push(CameraCommand::SetGrid((camera_setup.x, y)));
                             }
                         }
                     });
@@ -893,7 +893,7 @@ fn ui_camera_panel(world: &mut World, ui: &mut Ui) {
                             );
 
                             if response.changed() {
-                                camera_events.push(CameraEvent::Zoom(scale_value));
+                                camera_events.push(CameraCommand::Zoom(scale_value));
                             }
                         });
                     }
@@ -923,7 +923,8 @@ fn ui_camera_panel(world: &mut World, ui: &mut Ui) {
 
                                 let mut camera_name = text.sections[0].value.clone();
                                 if ui.text_edit_singleline(&mut camera_name).changed() {
-                                    camera_events.push(CameraEvent::SetName((entity, camera_name)));
+                                    camera_events
+                                        .push(CameraCommand::SetName((entity, camera_name)));
                                 }
                                 // ui.color_edit_button_srgba(&mut camera.colour);
                                 ui.end_row();
@@ -956,11 +957,11 @@ fn ui_camera_panel(world: &mut World, ui: &mut Ui) {
                                                 //         ),
                                                 //     },
                                                 // ));
-                                                camera_events.push(CameraEvent::SetName((
+                                                camera_events.push(CameraCommand::SetName((
                                                     entity,
                                                     ui_entry.description.clone(),
                                                 )));
-                                                camera_events.push(CameraEvent::LookAt((
+                                                camera_events.push(CameraCommand::LookAt((
                                                     entity,
                                                     transform.translation(),
                                                 )));
