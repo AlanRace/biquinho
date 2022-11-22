@@ -52,7 +52,7 @@ use bevy::{
 use bevy_prototype_lyon::plugin::ShapePlugin;
 use camera::CameraCommand;
 use data::DataPlugin;
-use imc::LoadIMC;
+use imc::{IMCEvent, LoadIMC};
 use imc_rs::MCD;
 
 use transform::AffineTransform;
@@ -150,32 +150,42 @@ impl From<std::io::Error> for Message {
 }
 
 /// Load in a dataset for testing automatically - if the dataset isn't found, then just skip loading data
-fn load_test_data(mut commands: Commands) {
-    let thread_pool = AsyncComputeTaskPool::get();
-
+fn load_test_data(mut imc_events: EventWriter<IMCEvent>) {
     let path = PathBuf::from(
         // "/home/alan/Documents/Work/Nicole/Salmonella/2019-10-25_Salmonella_final_VS+WT.mcd",
         "/home/alan/Documents/Work/20200609_ARDS_1921.mcd",
     );
 
-    let file = match File::open(&path) {
-        Ok(file) => file,
-        Err(_error) => {
-            println!("Not opening test data.");
-            return;
-        }
-    };
-
-    let load_task = thread_pool.spawn(async move {
-        let mcd = MCD::from_path(path)?.with_dcm()?;
-
-        // let xml = mcd.xml()?;
-        // std::fs::write("mcd.xml", xml);
-
-        Ok(mcd)
-    });
-    commands.spawn(LoadIMC(load_task));
+    if std::path::Path::new(&path).exists() {
+        imc_events.send(IMCEvent::Load(path));
+    }
 }
+// fn load_test_data(mut commands: Commands) {
+//     let thread_pool = AsyncComputeTaskPool::get();
+
+//     let path = PathBuf::from(
+//         // "/home/alan/Documents/Work/Nicole/Salmonella/2019-10-25_Salmonella_final_VS+WT.mcd",
+//         "/home/alan/Documents/Work/20200609_ARDS_1921.mcd",
+//     );
+
+//     let file = match File::open(&path) {
+//         Ok(file) => file,
+//         Err(_error) => {
+//             println!("Not opening test data.");
+//             return;
+//         }
+//     };
+
+//     let load_task = thread_pool.spawn(async move {
+//         let mcd = MCD::from_path(path)?.with_dcm()?;
+
+//         // let xml = mcd.xml()?;
+//         // std::fs::write("mcd.xml", xml);
+
+//         Ok(mcd)
+//     });
+//     commands.spawn(LoadIMC(load_task));
+// }
 
 /// Convert an `AffineTransform` into a bevy `Transform`.
 ///
