@@ -80,16 +80,9 @@ fn corner_coord(point: &Point<u32>, pixel_size: f32, corner: Corner) -> Vec2 {
 }
 
 fn process_boundaries_anticlockwise(contour: &Contour<u32>, pixel_size: f32) -> Vec<Vec2> {
-    let mut last_corner = Corner::BottomLeft;
+    let mut last_corner = Corner::TopLeft;
 
     let mut coords = Vec::with_capacity(contour.points.len());
-
-    // Add in the first point (top left of the first pixel)
-    // coords.push(corner_coord(
-    //     &contour.points[0],
-    //     pixel_size,
-    //     Corner::TopLeft,
-    // ));
 
     for (index, point) in contour.points.iter().enumerate() {
         let next_point = if index + 1 < contour.points.len() {
@@ -124,26 +117,49 @@ fn process_boundaries_anticlockwise(contour: &Contour<u32>, pixel_size: f32) -> 
             (Corner::TopRight, Corner::BottomRight)
         } else {
             // next_point == point
-            (Corner::TopLeft, Corner::BottomLeft)
+            (Corner::TopLeft, Corner::TopLeft)
         };
 
-        if index > 0 {
-            while last_corner != target_corner {
-                last_corner = last_corner.anticlockwise();
+        // if index > 0 {
+        while last_corner != target_corner {
+            last_corner = last_corner.anticlockwise();
 
-                coords.push(corner_coord(point, pixel_size, last_corner));
-            }
-        } else {
             coords.push(corner_coord(point, pixel_size, last_corner));
         }
+        // } else {
+        //     coords.push(corner_coord(point, pixel_size, last_corner));
+        // }
 
         last_corner = next_corner;
     }
 
-    // Finish adding in necessary points for the first point (also for cases where only one point )
-    while last_corner != Corner::TopLeft {
-        last_corner = last_corner.anticlockwise();
-        coords.push(corner_coord(&contour.points[0], pixel_size, last_corner));
+    // Finish adding in necessary points for the first point (also for cases where only one point)
+    if contour.points.len() == 1 {
+        coords.push(corner_coord(
+            &contour.points[0],
+            pixel_size,
+            Corner::TopLeft,
+        ));
+        coords.push(corner_coord(
+            &contour.points[0],
+            pixel_size,
+            Corner::BottomLeft,
+        ));
+        coords.push(corner_coord(
+            &contour.points[0],
+            pixel_size,
+            Corner::BottomRight,
+        ));
+        coords.push(corner_coord(
+            &contour.points[0],
+            pixel_size,
+            Corner::TopRight,
+        ));
+    } else {
+        while last_corner != Corner::TopLeft {
+            last_corner = last_corner.anticlockwise();
+            coords.push(corner_coord(&contour.points[0], pixel_size, last_corner));
+        }
     }
 
     coords
