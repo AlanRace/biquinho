@@ -914,12 +914,6 @@ fn load_imc(
                                                 },
                                                 Draggable,
                                                 Opacity(1.0),
-                                                TiledImage {
-                                                    size: Vec2::new(
-                                                        slide.width_in_um() as f32,
-                                                        slide.height_in_um() as f32,
-                                                    ),
-                                                },
                                                 BoundingBox {
                                                     x: 0.0,
                                                     y: 0.0,

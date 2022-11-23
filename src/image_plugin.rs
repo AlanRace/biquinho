@@ -564,6 +564,10 @@ fn split_image_into_tiles(
                     });
 
                     commands.entity(entity).insert(SpawnTiles(image_task));
+
+                    commands.entity(entity).insert(TiledImage {
+                        size: Vec2::new(to_tile.image_width, to_tile.image_height),
+                    });
                 }
                 Err(error) => {
                     commands.spawn(Message {
