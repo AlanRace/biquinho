@@ -33,6 +33,8 @@ impl Plugin for ImagePlugin {
             .add_system(update_loaded_image)
             .add_system(split_image_into_tiles)
             .add_system(spawn_tiles)
+            .add_system(sprite_opacity_changed)
+            .add_system(tiled_image_opacity_changed)
             .add_system(
                 handle_image_events
                     .label("image_events")
@@ -67,7 +69,6 @@ fn handle_image_events(
     mut commands: Commands,
     mut image_events: EventReader<ImageEvent>,
     mut q_image: Query<&mut ImageControl>,
-    mut q_sprite: Query<&mut Sprite>,
     mut q_visibility: Query<&mut Visibility>,
     mut q_opacity: Query<&mut Opacity>,
 ) {
@@ -81,10 +82,6 @@ fn handle_image_events(
             ImageEvent::SetOpacity(entity, opacity) => {
                 if let Ok(mut opacity_component) = q_opacity.get_mut(*entity) {
                     opacity_component.0 = *opacity;
-                }
-
-                if let Ok(mut sprite) = q_sprite.get_mut(*entity) {
-                    sprite.color.set_a(*opacity);
                 }
             }
             ImageEvent::SetVisibility(entity, is_visible) => {
@@ -350,6 +347,28 @@ pub struct TiledImage {
     pub size: Vec2,
 }
 
+#[derive(Default, Component)]
+pub struct Tile;
+
+fn sprite_opacity_changed(mut q_changed: Query<(&Opacity, &mut Sprite), Changed<Opacity>>) {
+    for (opacity, mut sprite) in q_changed.iter_mut() {
+        sprite.color.set_a(opacity.0);
+    }
+}
+
+fn tiled_image_opacity_changed(
+    q_changed: Query<(&Opacity, &Children), (With<TiledImage>, Changed<Opacity>)>,
+    mut q_tiles: Query<&mut Opacity, (Without<TiledImage>, With<Tile>)>,
+) {
+    for (tile_image_opacity, tiles) in q_changed.iter() {
+        for tile_entity in tiles {
+            if let Ok(mut opacity) = q_tiles.get_mut(*tile_entity) {
+                opacity.0 = tile_image_opacity.0;
+            }
+        }
+    }
+}
+
 fn div_ceil(x: u32, y: u32) -> u32 {
     1 + ((x - 1) / y)
 }
@@ -385,7 +404,7 @@ pub struct ToTileImage {
     pub image_height: f32,
 }
 
-pub struct Tile {
+pub struct SpawnTile {
     pub image: Image,
     pub transform: Transform,
     pub sprite: Sprite,
@@ -395,7 +414,7 @@ pub struct Tile {
 pub struct ComputeTileImage(pub Task<Result<ToTileImage, MCDError>>);
 
 #[derive(Component)]
-pub struct SpawnTiles(pub Task<Vec<Tile>>);
+pub struct SpawnTiles(pub Task<Vec<SpawnTile>>);
 
 fn spawn_tiles(
     mut commands: Commands,
@@ -408,12 +427,16 @@ fn spawn_tiles(
                 let texture_handle = textures.add(tile.image);
 
                 let tile_entity = commands
-                    .spawn(SpriteBundle {
-                        texture: texture_handle,
-                        transform: tile.transform,
-                        sprite: tile.sprite,
-                        ..Default::default()
-                    })
+                    .spawn((
+                        SpriteBundle {
+                            texture: texture_handle,
+                            transform: tile.transform,
+                            sprite: tile.sprite,
+                            ..Default::default()
+                        },
+                        Tile,
+                        Opacity(1.0),
+                    ))
                     .id();
 
                 commands.entity(entity).add_child(tile_entity);
@@ -439,7 +462,7 @@ fn split_image_into_tiles(
             match to_tile {
                 Ok(to_tile) => {
                     let image_task = thread_pool.spawn(async move {
-                        let mut tiles: Vec<Tile> = Vec::new();
+                        let mut tiles: Vec<SpawnTile> = Vec::new();
 
                         let tiles_x = div_ceil(to_tile.image.width(), to_tile.tile_width);
                         let tiles_y = div_ceil(to_tile.image.height(), to_tile.tile_height);
@@ -527,7 +550,7 @@ fn split_image_into_tiles(
 
                                 // commands.entity(entity).add_child(tile_entity);
 
-                                tiles.push(Tile {
+                                tiles.push(SpawnTile {
                                     image: image_texture,
                                     transform,
                                     sprite,

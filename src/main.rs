@@ -23,7 +23,7 @@
 //! - [ ] Implement means of dragging entire dataset
 //! - [ ] Provide option to load new dataset above loaded datasets
 
-use std::{fs::File, path::PathBuf};
+use std::path::PathBuf;
 
 /// AnnotationPlugin - handles everything related to drawing, saving and loading annotations.
 mod annotation;
@@ -45,15 +45,13 @@ mod ui;
 use bevy::{
     diagnostic::LogDiagnosticsPlugin,
     prelude::*,
-    tasks::AsyncComputeTaskPool,
     window::WindowId,
     winit::{WinitSettings, WinitWindows},
 };
 use bevy_prototype_lyon::plugin::ShapePlugin;
 use camera::CameraCommand;
 use data::DataPlugin;
-use imc::{IMCEvent, LoadIMC};
-use imc_rs::MCD;
+use imc::IMCEvent;
 
 use transform::AffineTransform;
 
