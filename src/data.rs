@@ -22,6 +22,8 @@ pub struct DataPlugin;
 impl Plugin for DataPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<DataCommand>()
+            .add_system(geometry_opacity_changed)
+            .add_system(cell_segmentation_opacity_changed)
             .add_system(issue_data_commands);
     }
 }
@@ -95,10 +97,10 @@ fn process_boundaries_anticlockwise(contour: &Contour<u32>, pixel_size: f32) -> 
             // Next point is up and left
             (Corner::TopLeft, Corner::BottomRight)
         } else if next_point.x < point.x && next_point.y == point.y {
-            // Left
+            // Next point is to the left
             (Corner::TopLeft, Corner::TopRight)
         } else if next_point.x < point.x && next_point.y > point.y {
-            // Bottom left
+            // Next point is down and left
             (Corner::BottomLeft, Corner::TopRight)
         } else if next_point.x == point.x && next_point.y > point.y {
             // Bottom
@@ -245,6 +247,47 @@ fn process_boundaries_clockwise(contour: &Contour<u32>, pixel_size: f32) -> Vec<
     coords
 }
 
+#[derive(Debug, Component)]
+pub struct CellSegmentation {
+    pub num_cells: u16,
+}
+
+#[derive(Debug, Component)]
+struct Cell;
+
+fn geometry_opacity_changed(mut q_changed: Query<(&Opacity, &mut DrawMode), Changed<Opacity>>) {
+    for (opacity, mut draw_mode) in q_changed.iter_mut() {
+        match draw_mode.as_mut() {
+            DrawMode::Fill(fill) => {
+                fill.color.set_a(opacity.0);
+            }
+            DrawMode::Stroke(stroke) => {
+                stroke.color.set_a(opacity.0);
+            }
+            DrawMode::Outlined {
+                fill_mode,
+                outline_mode,
+            } => {
+                fill_mode.color.set_a(opacity.0);
+                outline_mode.color.set_a(opacity.0);
+            }
+        }
+    }
+}
+
+fn cell_segmentation_opacity_changed(
+    q_changed: Query<(&Opacity, &Children), (With<CellSegmentation>, Changed<Opacity>)>,
+    mut q_cells: Query<&mut Opacity, (Without<CellSegmentation>, With<Cell>)>,
+) {
+    for (cell_seg_opacity, cells) in q_changed.iter() {
+        for cell_entity in cells {
+            if let Ok(mut opacity) = q_cells.get_mut(*cell_entity) {
+                opacity.0 = cell_seg_opacity.0;
+            }
+        }
+    }
+}
+
 fn issue_data_commands(
     mut commands: Commands,
 
@@ -306,130 +349,158 @@ fn issue_data_commands(
                     _ => todo!(),
                 }
 
-                let grey_image = GrayImage::from_raw(width, height, data.clone()).unwrap();
+                let grey_image = GrayImage::from_raw(width, height, data).unwrap();
                 let contours = find_contours::<u32>(&grey_image);
 
-                println!("{:?}", contours[4]);
-                println!("{:?}", process_boundaries_anticlockwise(&contours[4], 1.0));
-
-                let mut rng = rand::thread_rng();
-
-                for contour in contours.iter() {
-                    let mut builder = PathBuilder::new();
-
-                    let points = process_boundaries_anticlockwise(contour, 1.0);
-
-                    let first_point = &points[0];
-                    builder.move_to(Vec2::new(first_point.x, height as f32 - first_point.y));
-
-                    for point in points.iter().skip(1) {
-                        builder.line_to(Vec2::new(point.x, height as f32 - point.y));
-                    }
-
-                    builder.close();
-
-                    let path = builder.build();
-
-                    let colour = Color::Rgba {
-                        red: rng.gen_range(0.0..1.0),
-                        green: rng.gen_range(0.0..1.0),
-                        blue: rng.gen_range(0.0..1.0),
-                        alpha: 0.75,
-                    };
-
-                    let cell_segmentation = commands
-                        .spawn(GeometryBuilder::build_as(
-                            &path,
-                            DrawMode::Outlined {
-                                fill_mode: FillMode::color(colour),
-                                outline_mode: StrokeMode {
-                                    options: StrokeOptions::default().with_line_width(0.4),
-                                    color: colour, //Color::BLACK,
-                                },
-                            },
-                            Transform::from_xyz(width as f32 * -0.5, height as f32 * -0.5, 10.0),
-                        ))
-                        .id();
-
-                    // let cell_segmentation = commands
-                    //     .spawn(SpriteBundle {
-                    //         transform: Transform::from_xyz(0.0, 0.0, 1.0),
-                    //         texture: textures.add(image),
-                    //         sprite: Sprite {
-                    //             custom_size: Some(Vec2::new(width as f32, height as f32)),
-                    //             color: Color::Rgba {
-                    //                 red: 1.0,
-                    //                 green: 1.0,
-                    //                 blue: 1.0,
-                    //                 alpha: 0.5,
-                    //             },
-                    //             anchor: Anchor::Center,
-                    //             ..Default::default()
-                    //         },
-                    //         ..Default::default()
-                    //     })
-                    //     .insert(UiEntry {
-                    //         description: format!(
-                    //             "Cell segmentation: {:?}",
-                    //             cell_data.file_name().unwrap_or_else(|| OsStr::new(""))
-                    //         ),
-                    //     })
-                    //     .insert(Opacity(1.0))
-                    //     .insert(CellSegmentation {
-                    //         num_cells: max_cell_index,
-                    //     })
-                    //     .id();
-
-                    commands.entity(*entity).add_child(cell_segmentation);
-                }
-
-                let image = Image::new(
-                    Extent3d {
-                        width,
-                        height,
-                        depth_or_array_layers: 1,
-                    },
-                    TextureDimension::D2,
-                    data,
-                    TextureFormat::R8Unorm,
-                );
+                // println!("{:?}", contours[4]);
+                // println!("{:?}", process_boundaries_anticlockwise(&contours[4], 1.0));
 
                 let cell_segmentation = commands
-                    .spawn(SpriteBundle {
-                        transform: Transform::from_xyz(0.0, 0.0, 1.0),
-                        texture: textures.add(image),
-                        sprite: Sprite {
-                            custom_size: Some(Vec2::new(width as f32, height as f32)),
-                            color: Color::Rgba {
-                                red: 1.0,
-                                green: 1.0,
-                                blue: 1.0,
-                                alpha: 0.5,
-                            },
-                            anchor: Anchor::Center,
-                            ..Default::default()
+                    .spawn((
+                        SpatialBundle::default(),
+                        CellSegmentation {
+                            num_cells: max_cell_index,
                         },
-                        ..Default::default()
-                    })
-                    .insert(UiEntry {
-                        description: format!(
-                            "Cell segmentation: {:?}",
-                            cell_data.file_name().unwrap_or_else(|| OsStr::new(""))
-                        ),
-                    })
-                    .insert(Opacity(1.0))
-                    .insert(CellSegmentation {
-                        num_cells: max_cell_index,
+                        UiEntry {
+                            description: cell_data
+                                .as_path()
+                                .file_name()
+                                .map(|file_name| file_name.to_string_lossy().into_owned())
+                                .unwrap_or_else(|| "Cell segmentation".to_string())
+                                .to_string(),
+                        },
+                        Opacity(1.0),
+                    ))
+                    .with_children(|child_builder| {
+                        let mut rng = rand::thread_rng();
+
+                        for contour in contours.iter() {
+                            let mut builder = PathBuilder::new();
+
+                            let points = process_boundaries_anticlockwise(contour, 1.0);
+
+                            let first_point = &points[0];
+                            builder
+                                .move_to(Vec2::new(first_point.x, height as f32 - first_point.y));
+
+                            for point in points.iter().skip(1) {
+                                builder.line_to(Vec2::new(point.x, height as f32 - point.y));
+                            }
+
+                            builder.close();
+
+                            let path = builder.build();
+
+                            let colour = Color::Rgba {
+                                red: rng.gen_range(0.0..1.0),
+                                green: rng.gen_range(0.0..1.0),
+                                blue: rng.gen_range(0.0..1.0),
+                                alpha: 0.75,
+                            };
+
+                            child_builder.spawn((
+                                GeometryBuilder::build_as(
+                                    &path,
+                                    DrawMode::Outlined {
+                                        fill_mode: FillMode::color(colour),
+                                        outline_mode: StrokeMode {
+                                            options: StrokeOptions::default().with_line_width(0.4),
+                                            color: colour, //Color::BLACK,
+                                        },
+                                    },
+                                    Transform::from_xyz(
+                                        width as f32 * -0.5,
+                                        height as f32 * -0.5,
+                                        10.0,
+                                    ),
+                                ),
+                                Cell,
+                                Opacity(1.0),
+                            ));
+
+                            // let cell_segmentation = commands
+                            //     .spawn(SpriteBundle {
+                            //         transform: Transform::from_xyz(0.0, 0.0, 1.0),
+                            //         texture: textures.add(image),
+                            //         sprite: Sprite {
+                            //             custom_size: Some(Vec2::new(width as f32, height as f32)),
+                            //             color: Color::Rgba {
+                            //                 red: 1.0,
+                            //                 green: 1.0,
+                            //                 blue: 1.0,
+                            //                 alpha: 0.5,
+                            //             },
+                            //             anchor: Anchor::Center,
+                            //             ..Default::default()
+                            //         },
+                            //         ..Default::default()
+                            //     })
+                            //     .insert(UiEntry {
+                            //         description: format!(
+                            //             "Cell segmentation: {:?}",
+                            //             cell_data.file_name().unwrap_or_else(|| OsStr::new(""))
+                            //         ),
+                            //     })
+                            //     .insert(Opacity(1.0))
+                            //     .insert(CellSegmentation {
+                            //         num_cells: max_cell_index,
+                            //     })
+                            //     .id();
+
+                            // commands.entity(*entity).add_child(cell_segmentation);
+                        }
                     })
                     .id();
 
                 commands.entity(*entity).add_child(cell_segmentation);
+
+                // let image = Image::new(
+                //     Extent3d {
+                //         width,
+                //         height,
+                //         depth_or_array_layers: 1,
+                //     },
+                //     TextureDimension::D2,
+                //     data,
+                //     TextureFormat::R8Unorm,
+                // );
+
+                // let cell_segmentation = commands
+                //     .spawn(SpriteBundle {
+                //         transform: Transform::from_xyz(0.0, 0.0, 1.0),
+                //         texture: textures.add(image),
+                //         sprite: Sprite {
+                //             custom_size: Some(Vec2::new(width as f32, height as f32)),
+                //             color: Color::Rgba {
+                //                 red: 1.0,
+                //                 green: 1.0,
+                //                 blue: 1.0,
+                //                 alpha: 0.5,
+                //             },
+                //             anchor: Anchor::Center,
+                //             ..Default::default()
+                //         },
+                //         ..Default::default()
+                //     })
+                //     .insert(UiEntry {
+                //         description: format!(
+                //             "Cell segmentation: {:?}",
+                //             cell_data.file_name().unwrap_or_else(|| OsStr::new(""))
+                //         ),
+                //     })
+                //     .insert(Opacity(1.0))
+                //     .insert(CellSegmentation {
+                //         num_cells: max_cell_index,
+                //     })
+                //     .id();
+
+                // commands.entity(*entity).add_child(cell_segmentation);
             }
         }
     }
 }
 
-#[derive(Component)]
-pub struct CellSegmentation {
-    pub num_cells: u16,
-}
+// #[derive(Component)]
+// pub struct CellSegmentation {
+//     pub num_cells: u16,
+// }
