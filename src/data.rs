@@ -1,10 +1,6 @@
-use std::{ffi::OsStr, path::PathBuf};
+use std::path::PathBuf;
 
-use bevy::{
-    prelude::*,
-    render::render_resource::{Extent3d, TextureDimension, TextureFormat},
-    sprite::Anchor,
-};
+use bevy::prelude::*;
 use bevy_prototype_lyon::prelude::{
     DrawMode, FillMode, GeometryBuilder, PathBuilder, StrokeMode, StrokeOptions,
 };
@@ -262,14 +258,14 @@ fn geometry_opacity_changed(mut q_changed: Query<(&Opacity, &mut DrawMode), Chan
                 fill.color.set_a(opacity.0);
             }
             DrawMode::Stroke(stroke) => {
-                stroke.color.set_a(opacity.0);
+                // stroke.color.set_a(opacity.0);
             }
             DrawMode::Outlined {
                 fill_mode,
                 outline_mode,
             } => {
                 fill_mode.color.set_a(opacity.0);
-                outline_mode.color.set_a(opacity.0);
+                // outline_mode.color.set_a(opacity.0);
             }
         }
     }
@@ -391,12 +387,18 @@ fn issue_data_commands(
 
                             let path = builder.build();
 
-                            let colour = Color::Rgba {
-                                red: rng.gen_range(0.0..1.0),
-                                green: rng.gen_range(0.0..1.0),
-                                blue: rng.gen_range(0.0..1.0),
-                                alpha: 0.75,
+                            let colour = Color::Hsla {
+                                hue: rng.gen_range(0.0..360.0),
+                                saturation: rng.gen_range(0.0..1.0),
+                                lightness: rng.gen_range(0.25..1.0), // We want to make sure that we only use light colours so that we can see them well.
+                                alpha: 1.0,
                             };
+                            // Rgba {
+                            //     red: rng.gen_range(0.2..1.0),
+                            //     green: rng.gen_range(0.2..1.0),
+                            //     blue: rng.gen_range(0.2..1.0),
+                            //     alpha: 1.0,
+                            // };
 
                             child_builder.spawn((
                                 GeometryBuilder::build_as(
