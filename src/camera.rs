@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use arboard::Clipboard;
 use bevy::{
     core_pipeline::clear_color::ClearColorConfig,
@@ -84,7 +86,13 @@ pub enum CameraCommand {
     /// in-sync.
     Zoom(f32),
 
-    CopyToClipboard,
+    SaveTo(SaveToTarget),
+}
+
+#[derive(Debug, Component, Clone)]
+pub enum SaveToTarget {
+    Clipboard,
+    File(PathBuf),
 }
 
 /// Handle all camera events
@@ -145,7 +153,7 @@ fn issue_camera_commands(
                     transform.scale.y = *zoom;
                 }
             }
-            CameraCommand::CopyToClipboard => {
+            CameraCommand::SaveTo(target) => {
                 let size = images
                     .get(&camera_setup.target.as_ref().unwrap())
                     .unwrap()
@@ -180,11 +188,14 @@ fn issue_camera_commands(
 
                 // TODO: update the size of cpu_target here to re
 
-                commands.spawn(ImageCopier::new(
-                    camera_setup.target.as_ref().unwrap().clone(),
-                    camera_setup.cpu_target.as_ref().unwrap().clone(),
-                    size,
-                    &render_device,
+                commands.spawn((
+                    ImageCopier::new(
+                        camera_setup.target.as_ref().unwrap().clone(),
+                        camera_setup.cpu_target.as_ref().unwrap().clone(),
+                        size,
+                        &render_device,
+                    ),
+                    target.clone(),
                 ));
                 // image_copier.disable();)
 
@@ -204,11 +215,11 @@ fn issue_camera_commands(
 
 fn copy_to_clipboard(
     mut commands: Commands,
-    q_copier: Query<(Entity, &ImageCopier)>,
+    q_copier: Query<(Entity, &ImageCopier, &SaveToTarget)>,
     camera_setup: Res<CameraSetup>,
     mut images: ResMut<Assets<Image>>,
 ) {
-    for (entity, copier) in q_copier.iter() {
+    for (entity, copier, target) in q_copier.iter() {
         if copier.copy_count() == 0 && copier.render_count() == 0 {
             continue;
         }
@@ -245,18 +256,23 @@ fn copy_to_clipboard(
         let data_length = data.len();
 
         if expected_length == data.len() {
-            let img_data = arboard::ImageData {
-                width: size.x as usize,
-                height: size.y as usize,
-                bytes: data.into(),
-            };
+            match target {
+                SaveToTarget::Clipboard => {
+                    let img_data = arboard::ImageData {
+                        width: size.x as usize,
+                        height: size.y as usize,
+                        bytes: data.into(),
+                    };
 
-            if let Err(error) = ctx.set_image(img_data) {
-                commands.spawn(Message {
-                severity: Severity::Error,
-                message: format!("Error occured when trying to copy image to clipboard. This can happen if data is still loading in the background. Please try again.\n\nExpected size: {} x {}\nData size: {}\nData size(pre-filter): {}\n\nDescription: {:?}", 
-                size.x, size.y, data_length, pre_data_length, error),
-            });
+                    if let Err(error) = ctx.set_image(img_data) {
+                        commands.spawn(Message {
+                        severity: Severity::Error,
+                        message: format!("Error occured when trying to copy image to clipboard. This can happen if data is still loading in the background. Please try again.\n\nExpected size: {} x {}\nData size: {}\nData size(pre-filter): {}\n\nDescription: {:?}", 
+                        size.x, size.y, data_length, pre_data_length, error),
+                    });
+                    }
+                }
+                SaveToTarget::File(path) => {}
             }
 
             commands.entity(entity).despawn_recursive();

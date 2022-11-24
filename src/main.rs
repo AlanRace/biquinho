@@ -11,17 +11,36 @@
 //! - [x] Select channels to form RGB composite with user-specified thresholds
 //! - [x] View multiple IMC acquisitions in single .mcd file at once (multi-camera)
 //! - [ ] View multiple .mcd files
+//! - [ ] Save/load current view/project
 //! - [x] Add annotatations and annotate data (e.g. with pencil tool)
 //! - [ ] Classify IMC data based on annotations
 //! - [ ] Segment cells based on classification data
 //! - [x] Load and visualise cell segmentation results
 //! - [ ] Calculate per-cell statistics (e.g. channel intensity)
+//! - [ ] Cell phenotyping
+//! - [ ] Network/neighbourhood analysis
 //!
 //!
 //!
 //! ## TODO: View multiple .mcd files
 //! - [ ] Implement means of dragging entire dataset
 //! - [ ] Provide option to load new dataset above loaded datasets
+//!
+//! ## TODO: Segment cells based on classification data
+//! - [ ] Watershed on probability map (random forest)
+//! - [ ] U-Net
+//!
+//! ## TODO: Calculate per-cell statistics (e.g. channel intensity)
+//! - [ ] Link a cell to a specific acquisition
+//! - [ ] Calculate cell area and shape(?)
+//! - [ ] Calculate mean/std/median for each channel within cell
+//! - [ ] Allow the selection of a single channel - colour each cell with mean/median of this channel data
+//! - [ ] Export cell data to csv
+//!
+//! ## TODO: Cell phenotyping
+//! - [ ] Manual thresholding / gating
+//! - [ ] UMAP & density-based clustering
+//! - [ ] Variational inference
 
 use std::path::PathBuf;
 

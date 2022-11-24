@@ -16,7 +16,7 @@ use crate::{
     annotation::{AnnotationEvent, AnnotationPlugin},
     camera::{
         CameraCommand, CameraPlugin, CameraSetup, Draggable, FieldOfView, MousePosition, PanCamera,
-        Selectable,
+        SaveToTarget, Selectable,
     },
     data::{CellSegmentation, DataCommand},
     image_plugin::{ImageControl, ImageEvent, Opacity},
@@ -844,7 +844,16 @@ fn ui_camera_panel(world: &mut World, ui: &mut Ui) {
                     let camera_setup = world.resource::<CameraSetup>();
 
                     if ui.button("Copy view to clipboard").clicked() {
-                        camera_events.push(CameraCommand::CopyToClipboard);
+                        camera_events.push(CameraCommand::SaveTo(SaveToTarget::Clipboard));
+                    }
+                    if ui.button("Save view as file").clicked() {
+                        if let Some(path) = rfd::FileDialog::new()
+                            .add_filter("TIFF (.tif, .tiff)", &["tif", "tiff"])
+                            .add_filter("JPEG (.jpg, .jpeg)", &["jpg", "jpeg"])
+                            .save_file()
+                        {
+                            camera_events.push(CameraCommand::SaveTo(SaveToTarget::File(path)));
+                        }
                     }
 
                     ui.horizontal(|ui| {
