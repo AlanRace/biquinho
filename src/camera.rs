@@ -18,6 +18,7 @@ use bevy::{
     window::{WindowId, WindowResized},
 };
 use bevy_egui::EguiContext;
+use image::RgbaImage;
 
 use crate::{
     image_copy::{ImageCopier, ImageCopyPlugin},
@@ -51,7 +52,7 @@ impl Plugin for CameraPlugin {
                                 // .after(UiLabel::Display),
             )
             .add_system(ui_changed)
-            .add_system(copy_to_clipboard.before("issue_camera_commands")) // This should be before handling camera events, to force it to be run on the next frame - otherwise the screenshot is empty
+            .add_system(save_view_to_target.before("issue_camera_commands")) // This should be before handling camera events, to force it to be run on the next frame - otherwise the screenshot is empty
             .add_system_to_stage(CoreStage::Update, update_camera)
             .add_system(issue_camera_commands.label("issue_camera_commands"))
             .add_system(
@@ -213,7 +214,7 @@ fn issue_camera_commands(
     }
 }
 
-fn copy_to_clipboard(
+fn save_view_to_target(
     mut commands: Commands,
     q_copier: Query<(Entity, &ImageCopier, &SaveToTarget)>,
     camera_setup: Res<CameraSetup>,
@@ -272,7 +273,16 @@ fn copy_to_clipboard(
                     });
                     }
                 }
-                SaveToTarget::File(path) => {}
+                SaveToTarget::File(path) => {
+                    if let Some(image) = RgbaImage::from_vec(size.x as u32, size.y as u32, data) {
+                        if let Err(error) = image.save(path) {
+                            commands.spawn(Message {
+                                severity: Severity::Error,
+                                message: error.to_string(),
+                            });
+                        }
+                    }
+                }
             }
 
             commands.entity(entity).despawn_recursive();

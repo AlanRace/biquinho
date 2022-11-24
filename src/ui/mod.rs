@@ -10,6 +10,7 @@ use bevy_egui::{
     },
     EguiContext, EguiPlugin, EguiSettings,
 };
+use chrono::{DateTime, Datelike, Local, Timelike, Utc};
 use imc_rs::ChannelIdentifier;
 
 use crate::{
@@ -847,7 +848,20 @@ fn ui_camera_panel(world: &mut World, ui: &mut Ui) {
                         camera_events.push(CameraCommand::SaveTo(SaveToTarget::Clipboard));
                     }
                     if ui.button("Save view as file").clicked() {
+                        // let now = Utc::now();
+                        let now: DateTime<Local> = Local::now();
+                        let (is_common_era, year) = now.year_ce();
+
                         if let Some(path) = rfd::FileDialog::new()
+                            .set_file_name(&format!(
+                                "{}-{:02}-{:02}_{}-{}-{}_biquinho-screenshot.tif",
+                                year,
+                                now.month(),
+                                now.day(),
+                                now.hour(),
+                                now.minute(),
+                                now.second()
+                            ))
                             .add_filter("TIFF (.tif, .tiff)", &["tif", "tiff"])
                             .add_filter("JPEG (.jpg, .jpeg)", &["jpg", "jpeg"])
                             .save_file()
