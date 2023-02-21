@@ -846,7 +846,7 @@ dependencies = [
 
 [[package]]
 name = "biquinho"
-version = "0.2.7"
+version = "0.2.11"
 dependencies = [
  "arboard",
  "bevy",
