@@ -5,7 +5,7 @@ use std::{
 };
 
 use bevy::{math::DVec2, prelude::*};
-use bevy_egui::{egui::Color32, EguiContext};
+use bevy_egui::{EguiContext};
 use bevy_prototype_lyon::prelude::{
     DrawMode, FillMode, GeometryBuilder, PathBuilder, StrokeMode, StrokeOptions,
 };

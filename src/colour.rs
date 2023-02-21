@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use egui::Color32;
+use bevy_egui::egui::Color32;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]

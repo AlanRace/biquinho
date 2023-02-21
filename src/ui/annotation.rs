@@ -1,5 +1,6 @@
 use bevy::prelude::*;
-use egui::{Color32, Ui};
+use bevy_egui::egui::{Color32, Ui};
+// use egui::{Color32, Ui};
 use rand::Rng;
 
 use crate::{
@@ -13,7 +14,7 @@ pub(super) fn create_annotation_ui(world: &mut World, ui: &mut Ui) {
     let mut ui_events = Vec::new();
 
     world.resource_scope(|world, mut ui_state: Mut<UiState>| {
-        egui::Grid::new("annotation_grid")
+        bevy_egui::egui::Grid::new("annotation_grid")
             .num_columns(3)
             //.spacing([10.0, 4.0])
             .striped(true)
@@ -53,9 +54,9 @@ pub(super) fn create_annotation_ui(world: &mut World, ui: &mut Ui) {
 
                     ui.horizontal(|ui| {
                         if editing {
-                            let button = egui::ImageButton::new(
+                            let button = bevy_egui::egui::ImageButton::new(
                                 ui_state.icon(UiIcon::EditOff),
-                                egui::Vec2::splat(ui_state.icon_size),
+                                bevy_egui::egui::Vec2::splat(ui_state.icon_size),
                             );
 
                             if ui
@@ -75,9 +76,11 @@ pub(super) fn create_annotation_ui(world: &mut World, ui: &mut Ui) {
                                         ui.style_mut().spacing.slider_width = 50.0;
 
                                         let radius_response = ui.add(
-                                            egui::Slider::new(&mut radius, 0.0..=200.0)
+                                            bevy_egui::egui::Slider::new(&mut radius, 0.0..=200.0)
                                                 .smart_aim(false)
-                                                .orientation(egui::SliderOrientation::Horizontal)
+                                                .orientation(
+                                                    bevy_egui::egui::SliderOrientation::Horizontal,
+                                                )
                                                 .text("Radius"),
                                         );
 
@@ -95,9 +98,9 @@ pub(super) fn create_annotation_ui(world: &mut World, ui: &mut Ui) {
                                 }
                             }
                         } else {
-                            let button = egui::ImageButton::new(
+                            let button = bevy_egui::egui::ImageButton::new(
                                 ui_state.icon(UiIcon::Edit),
-                                egui::Vec2::splat(ui_state.icon_size),
+                                bevy_egui::egui::Vec2::splat(ui_state.icon_size),
                             );
 
                             if ui
@@ -116,9 +119,9 @@ pub(super) fn create_annotation_ui(world: &mut World, ui: &mut Ui) {
 
                             match visibility.is_visible {
                                 true => {
-                                    let visibility_button = egui::ImageButton::new(
+                                    let visibility_button = bevy_egui::egui::ImageButton::new(
                                         ui_state.icon(UiIcon::Visible),
-                                        egui::Vec2::splat(ui_state.icon_size),
+                                        bevy_egui::egui::Vec2::splat(ui_state.icon_size),
                                     );
 
                                     if ui
@@ -132,9 +135,9 @@ pub(super) fn create_annotation_ui(world: &mut World, ui: &mut Ui) {
                                     }
                                 }
                                 false => {
-                                    let visibility_button = egui::ImageButton::new(
+                                    let visibility_button = bevy_egui::egui::ImageButton::new(
                                         ui_state.icon(UiIcon::NotVisible),
-                                        egui::Vec2::splat(ui_state.icon_size),
+                                        bevy_egui::egui::Vec2::splat(ui_state.icon_size),
                                     );
 
                                     if ui
@@ -149,9 +152,9 @@ pub(super) fn create_annotation_ui(world: &mut World, ui: &mut Ui) {
                                 }
                             }
 
-                            let button = egui::ImageButton::new(
+                            let button = bevy_egui::egui::ImageButton::new(
                                 ui_state.icon(UiIcon::Remove),
-                                egui::Vec2::splat(ui_state.icon_size),
+                                bevy_egui::egui::Vec2::splat(ui_state.icon_size),
                             );
 
                             if ui
@@ -183,9 +186,9 @@ pub(super) fn create_annotation_ui(world: &mut World, ui: &mut Ui) {
                     ui.end_row();
                 }
 
-                let button = egui::ImageButton::new(
+                let button = bevy_egui::egui::ImageButton::new(
                     ui_state.icon(UiIcon::Add),
-                    egui::Vec2::splat(ui_state.icon_size),
+                    bevy_egui::egui::Vec2::splat(ui_state.icon_size),
                 );
 
                 // Add in extra row for adding a new annotation

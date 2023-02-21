@@ -1,6 +1,6 @@
 use bevy::prelude::*;
+use bevy_egui::egui::{color_picker::show_color, ScrollArea};
 use bevy_egui::EguiContext;
-use egui::{color_picker::show_color, ScrollArea};
 use imc_rs::{Acquisitions, ChannelIdentifier};
 use std::collections::HashMap;
 
@@ -58,7 +58,7 @@ fn ui_classification_window(
     mut ui_events: EventWriter<UiEvent>,
 ) {
     for mut window in q_window.iter_mut() {
-        egui::Window::new("Classification")
+        bevy_egui::egui::Window::new("Classification")
             //.anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
             .show(egui_ctx.ctx_mut(), |ui| {
                 ui.horizontal(|ui| {
@@ -79,7 +79,7 @@ fn ui_classification_window(
                 if window.target == ClassificationTarget::WholeImage {
                     ui.label("Acquisitions");
 
-                    egui::Grid::new("acquisitions_grid")
+                    bevy_egui::egui::Grid::new("acquisitions_grid")
                         .num_columns(3)
                         .show(ui, |ui| {
                             for imc in q_imc.iter() {
@@ -141,7 +141,7 @@ fn ui_classification_window(
 
                 let channels = acquisitions.channels();
                 let id = ui.make_persistent_id("header_for_channels");
-                egui::collapsing_header::CollapsingState::load_with_default_open(
+                bevy_egui::egui::collapsing_header::CollapsingState::load_with_default_open(
                     ui.ctx(),
                     id,
                     true,
@@ -161,7 +161,7 @@ fn ui_classification_window(
                         .auto_shrink([false, true])
                         .show_viewport(ui, |ui, viewport| {
                             // List all channels
-                            egui::Grid::new("channels_grid")
+                            bevy_egui::egui::Grid::new("channels_grid")
                                 .num_columns(3)
                                 .show(ui, |ui| {
                                     for (index, channel) in channels.iter().enumerate() {
@@ -216,7 +216,7 @@ fn ui_classification_window(
                     }
                 });
 
-                egui::Grid::new("annotations_grid")
+                bevy_egui::egui::Grid::new("annotations_grid")
                     .num_columns(3)
                     .show(ui, |ui| {
                         for (index, (entity, annotation)) in q_annotation.iter().enumerate() {
@@ -230,7 +230,11 @@ fn ui_classification_window(
                                     }
                                 }
 
-                                show_color(ui, annotation.colour().egui(), egui::Vec2::splat(16.0));
+                                show_color(
+                                    ui,
+                                    annotation.colour().egui(),
+                                    bevy_egui::egui::Vec2::splat(16.0),
+                                );
                             });
 
                             if index % 3 == 2 {

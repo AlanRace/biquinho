@@ -16,7 +16,7 @@ use bevy::{
     sprite::Anchor,
     tasks::{AsyncComputeTaskPool, Task},
 };
-use egui::Color32;
+use bevy_egui::egui::Color32;
 use futures_lite::future;
 
 use nalgebra::Matrix4;
@@ -371,7 +371,7 @@ fn create_labelled_data(
             // Perform random forest classification
 
             for (x, y) in pixels {
-                let spectrum = acquisition.spectrum(x as usize, y as usize).unwrap();
+                let spectrum = acquisition.spectrum(x, y).unwrap();
 
                 let mut to_classify = vec![0.0; channels.len()];
 

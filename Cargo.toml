@@ -7,7 +7,8 @@ description = ""
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bevy_egui = "0.17"
+#bevy_egui = {version = "0.19", features = ["serde"]}
+bevy_egui = { git = "https://github.com/AlanRace/bevy_egui", branch="serde", features = ["serde"]}
 bevy_prototype_lyon = "0.7" 
 hex = "0.4"
 image = "0.24.1"
@@ -72,15 +73,13 @@ features = [
   "wayland"
 ]
 
-# Enable serde in egui as it is currently not enabled in bevy_egui
-[dependencies.egui]
-features = ["serde"]
+
 
 [profile.dev]
 opt-level = 3
 
 
-[patch.crates-io]
+# [patch.crates-io]
 #bevy_egui = { path = "../bevy_egui" }
 #egui = {path = "../egui"}
 #egui = { git = "https://github.com/emilk/egui"}
