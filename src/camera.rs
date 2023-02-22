@@ -230,8 +230,6 @@ fn save_view_to_target(
             copier.render_count()
         );
 
-        let mut ctx = Clipboard::new().unwrap();
-
         let view_texture = images
             .get_mut(&camera_setup.cpu_target.as_ref().unwrap())
             .unwrap();
@@ -259,6 +257,8 @@ fn save_view_to_target(
         if expected_length == data.len() {
             match target {
                 SaveToTarget::Clipboard => {
+                    let mut ctx = Clipboard::new().unwrap();
+
                     let img_data = arboard::ImageData {
                         width: size.x as usize,
                         height: size.y as usize,
@@ -455,7 +455,6 @@ fn setup(
             // transform: Transform::from_xyz(-1000000.0, 1000000.0, 0.0),
             ..default()
         },
-        UiCameraConfig::default(),
         ui_layer,
     ));
 
@@ -478,13 +477,14 @@ fn setup(
                 priority: 101,
                 ..default()
             },
-            camera_2d: Camera2d {
-                // don't clear the color while rendering this camera
-                clear_color: ClearColorConfig::None,
-            },
+            // camera_2d: Camera2d {
+            //     // don't clear the color while rendering this camera
+            //     clear_color: ClearColorConfig::None,
+            // },
             ..default()
         },
         texture_layer,
+        UiCameraConfig { show_ui: false },
     ));
 
     commands.spawn(MousePosition::default());
@@ -631,6 +631,7 @@ fn window_resized(
 }
 
 fn update_camera(
+    mut commands: Commands,
     windows: Res<Windows>,
     ui_space: Res<UiSpace>,
     camera_setup: Res<CameraSetup>,
@@ -662,11 +663,23 @@ fn update_camera(
     let width = physical_camera_width as f32 / window.scale_factor() as f32;
     let height = physical_camera_height as f32 / window.scale_factor() as f32;
 
-    info!("Window resized - resizing all textures");
+    info!(
+        "Window resized - resizing all textures. Each camera has sizes: scaled = ({}, {}) physical = ({}, {})",
+        width, height, physical_camera_width, physical_camera_height
+    );
 
     // TODO: Do we really want to resize these images every time?
     let image_width = physical_view_width as f32; // / window.scale_factor() as f32;
     let image_height = (window.physical_height() - top_panel_height as u32) as f32; // / window.scale_factor() as f32;
+
+    if image_width < 0.0 || image_height < 0.0 {
+        commands.spawn(Message {
+            severity: Severity::Error,
+            message: format!("Error occured when trying to update_camera. Trying to set width to {} and height to {}", 
+            image_width, image_height)
+        });
+        return;
+    }
 
     images
         .get_mut(&camera_setup.target.as_ref().unwrap())
@@ -691,6 +704,8 @@ fn update_camera(
 
     // UI pixel coordinates start at (0, 0) at bottom left
 
+    let text_margin = 10.0 * window.scale_factor() as f32;
+
     for (mut camera, position) in cameras.iter_mut() {
         camera.viewport = Some(Viewport {
             physical_position: UVec2::new(
@@ -713,15 +728,29 @@ fn update_camera(
                 }
             }
 
-            let pos_y = ((height as u32 + camera_setup.margin) * (camera_setup.y - position.y - 1))
-                as f32
-                + ui_space.bottom();
+            // Make sure that we scale the font size correctly
+            text.sections[0].style.font_size = 20.0 * window.scale_factor() as f32;
+
+            // let pos_y = ((height as u32 + camera_setup.margin) * (camera_setup.y - position.y - 1))
+            //     as f32
+            //     + ui_space.bottom();
+
+            let text_position_x = (physical_camera_width + camera_setup.margin) as f32
+                * position.x as f32
+                + text_margin; // ((width as u32 + camera_setup.margin) * position.x) as f32 + 10.0;
+            let text_position_y = (physical_camera_height + camera_setup.margin) as f32
+                * (position.y + 1) as f32
+                - text_margin;
+            info!(
+                "Setting {} label to location {}, {}",
+                text.sections[0].value, text_position_x, text_position_y
+            );
 
             style.position = UiRect {
-                left: Val::Px(((width as u32 + camera_setup.margin) * position.x) as f32 + 10.0),
+                left: Val::Px(text_position_x),
                 // right: Val::Px(((width + camera_setup.margin) * (position.x + 1)) as f32),
                 //top: Val::Px(pos_y + 100.0),
-                bottom: Val::Px(pos_y + 10.0), // Need to take into account the bottom info bar from egui!
+                top: Val::Px(text_position_y), // Need to take into account the bottom info bar from egui!
                 ..default()
             };
         }
